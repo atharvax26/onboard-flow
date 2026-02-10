@@ -29,7 +29,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
               <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Email</label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@demo.com" className="mt-1 font-mono text-sm" />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@demo.com" className="mt-1 font-mono text-sm" required />
             </div>
             <div>
               <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Password</label>
