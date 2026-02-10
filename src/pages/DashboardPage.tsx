@@ -34,7 +34,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Upload card */}
-        <Card className="animate-slide-up cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate("/upload")}>
+        <Card className="animate-slide-up cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/50" onClick={() => navigate("/upload")}>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider">Upload Document</CardTitle>
           </CardHeader>
