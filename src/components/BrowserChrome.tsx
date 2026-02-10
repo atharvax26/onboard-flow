@@ -3,21 +3,26 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, ArrowRight, RotateCw, Lock, LogOut } from "lucide-react";
 
-const TABS = [
+const USER_TABS = [
   { label: "Home", path: "/dashboard" },
   { label: "Document Upload", path: "/upload" },
   { label: "Onboarding", path: "/onboarding" },
   { label: "Account Details", path: "/account" },
 ];
 
-const ADMIN_TAB = { label: "Analytics", path: "/analytics" };
+const ADMIN_TABS = [
+  { label: "Home", path: "/dashboard" },
+  { label: "Document Upload", path: "/upload" },
+  { label: "Account Details", path: "/account" },
+  { label: "Analytics", path: "/analytics" },
+];
 
 export default function BrowserChrome({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAdmin, logout } = useAuth();
 
-  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
+  const tabs = isAdmin ? ADMIN_TABS : USER_TABS;
 
   return (
     <div className="min-h-screen bg-background pattern-grid flex items-start justify-center p-2 sm:p-4">
