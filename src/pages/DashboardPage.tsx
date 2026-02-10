@@ -51,7 +51,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Documents card */}
-        <Card className="animate-slide-up">
+        <Card className="animate-slide-up transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider">Documents</CardTitle>
           </CardHeader>
