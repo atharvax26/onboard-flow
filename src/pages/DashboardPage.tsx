@@ -22,7 +22,7 @@ export default function DashboardPage() {
 
       <div className="grid md:grid-cols-3 gap-4">
         {/* Status card */}
-        <Card className="animate-slide-up">
+        <Card className="animate-slide-up transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider">Onboarding Status</CardTitle>
           </CardHeader>
