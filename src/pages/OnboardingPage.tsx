@@ -66,7 +66,19 @@ export default function OnboardingPage() {
 
       {/* Center - Step details */}
       <div className="flex-1 p-6 md:p-8">
-        {active && (
+        {percent === 100 && (
+          <div className="animate-slide-up max-w-xl text-center py-12">
+            <CheckCircle className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Onboarding Complete!</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              You've successfully completed all {steps.length} onboarding steps. Your account is fully set up and ready to go.
+            </p>
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 inline-block">
+              <p className="text-sm font-mono text-primary">{completedCount}/{steps.length} steps completed • 100%</p>
+            </div>
+          </div>
+        )}
+        {percent < 100 && active && (
           <div className="animate-slide-up max-w-xl">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">Step {active.id}</span>
