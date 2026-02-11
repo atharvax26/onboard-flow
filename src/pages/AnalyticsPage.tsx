@@ -84,7 +84,7 @@ export default function AnalyticsPage() {
           { label: "Total Users", value: totalUsers, icon: Users },
           { label: "Completion Rate", value: `${completionRate}%`, icon: CheckCircle },
           { label: "Avg Progress", value: `${avgCompletion}%`, icon: Clock },
-          { label: "Bottleneck", value: bottleneckStep, icon: TrendingDown },
+          { label: "Bottleneck", value: bottleneckStep, subtitle: `~${stepData.reduce((a, b) => (b.avgTime > a.avgTime ? b : a)).avgTime}min avg`, icon: TrendingDown },
         ].map((s) => (
           <Card key={s.label} className="transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 cursor-default">
             <CardContent className="p-4">
@@ -92,7 +92,8 @@ export default function AnalyticsPage() {
                 <s.icon className="w-3.5 h-3.5 text-primary" />
                 <span className="text-[10px] font-mono text-muted-foreground uppercase">{s.label}</span>
               </div>
-              <p className="text-lg font-semibold truncate">{s.value}</p>
+              <p className="text-lg font-semibold leading-snug">{s.value}</p>
+              {"subtitle" in s && s.subtitle && <p className="text-[10px] font-mono text-muted-foreground mt-0.5">{s.subtitle}</p>}
             </CardContent>
           </Card>
         ))}
