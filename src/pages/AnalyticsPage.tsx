@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
           { label: "Avg Progress", value: `${avgCompletion}%`, icon: Clock },
           { label: "Bottleneck", value: bottleneckStep, icon: TrendingDown },
         ].map((s) => (
-          <Card key={s.label}>
+          <Card key={s.label} className="transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 cursor-default">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <s.icon className="w-3.5 h-3.5 text-primary" />
@@ -100,7 +100,7 @@ export default function AnalyticsPage() {
 
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-4">
-        <Card>
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider">Users per Step</CardTitle>
           </CardHeader>
@@ -115,7 +115,7 @@ export default function AnalyticsPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider">Status Distribution</CardTitle>
           </CardHeader>
@@ -133,7 +133,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* User table */}
-      <Card>
+      <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider">All Users</CardTitle>
           <div className="relative w-48">
