@@ -2,10 +2,10 @@ import { useState, useMemo } from "react";
 import { MOCK_ONBOARDING_STEPS } from "@/lib/mock-data";
 import { OnboardingStep } from "@/lib/types";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
+import StepContent from "@/components/onboarding/StepContent";
 import {
   CheckCircle, Circle, Play, Clock, GitBranch, Sparkles, Brain,
-  Building2, FileText, BarChart3, Zap, Shield, ArrowRight, Info
+  Building2, FileText, BarChart3, Shield, Info
 } from "lucide-react";
 
 const MATURITY_LEVELS = [
@@ -15,15 +15,15 @@ const MATURITY_LEVELS = [
   { label: "Enterprise", range: [76, 100], color: "text-primary", bg: "bg-primary/10" },
 ];
 
-const AI_INSIGHTS: Record<number, { tag: string; reason: string; priority: "high" | "medium" | "low" }> = {
-  1: { tag: "Foundation", reason: "AI detected: Company profile drives 6 downstream step customizations", priority: "high" },
-  2: { tag: "Collaboration", reason: "AI analysis: Teams with 3+ members complete onboarding 40% faster", priority: "high" },
-  3: { tag: "Regulatory", reason: "AI flagged: Your industry requires compliance review before integrations", priority: "high" },
-  4: { tag: "Connectivity", reason: "AI matched: 3 integration templates based on your company profile", priority: "medium" },
-  5: { tag: "Data Layer", reason: "AI estimated: Migration complexity is moderate based on document analysis", priority: "medium" },
-  6: { tag: "Automation", reason: "AI generated: 4 workflow templates tailored to your operational maturity", priority: "medium" },
-  7: { tag: "Enablement", reason: "AI personalized: Training path based on team roles and experience level", priority: "low" },
-  8: { tag: "Launch", reason: "AI compiled: Pre-launch checklist from 12 configuration verification points", priority: "low" },
+const AI_INSIGHTS: Record<number, { tag: string; priority: "high" | "medium" | "low" }> = {
+  1: { tag: "Foundation", priority: "high" },
+  2: { tag: "Collaboration", priority: "high" },
+  3: { tag: "Regulatory", priority: "high" },
+  4: { tag: "Connectivity", priority: "medium" },
+  5: { tag: "Data Layer", priority: "medium" },
+  6: { tag: "Automation", priority: "medium" },
+  7: { tag: "Enablement", priority: "low" },
+  8: { tag: "Launch", priority: "low" },
 };
 
 const PRIORITY_STYLES = {
@@ -162,70 +162,7 @@ export default function OnboardingPage() {
           </div>
         )}
         {percent < 100 && active && (
-          <div className="animate-slide-up max-w-2xl">
-            {/* Step header badges */}
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">Step {active.id}</span>
-              <span className={`text-xs font-mono px-2 py-0.5 rounded capitalize ${
-                active.status === "completed" ? "bg-primary/10 text-primary" : active.status === "in_progress" ? "bg-yellow-100 text-yellow-700" : "bg-muted text-muted-foreground"
-              }`}>{active.status.replace("_", " ")}</span>
-              {insight && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-dark text-primary flex items-center gap-1">
-                  <Sparkles className="w-2.5 h-2.5" /> AI-Adapted
-                </span>
-              )}
-            </div>
-
-            <h2 className="text-xl font-semibold mt-2 mb-1">{active.title}</h2>
-            <p className="text-sm text-muted-foreground mb-4">{active.description}</p>
-
-            {/* AI Insight Card */}
-            {insight && (
-              <div className={`rounded-lg border p-3 mb-4 flex items-start gap-3 transition-all duration-300 hover:shadow-md ${PRIORITY_STYLES[insight.priority]}`}>
-                <Brain className="w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wider mb-0.5 opacity-70">AI Insight • {insight.priority} priority</p>
-                  <p className="text-xs font-mono leading-relaxed">{insight.reason}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Step content */}
-            <div className="bg-background rounded-lg border border-border p-5 mb-6 pattern-grid">
-              <p className="text-sm leading-relaxed">{active.details}</p>
-            </div>
-
-            {/* Adaptive recommendations */}
-            {active.status === "in_progress" && (
-              <div className="mb-6">
-                <p className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
-                  <Zap className="w-3 h-3" /> AI Recommendations
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[
-                    "Auto-fill from uploaded documents",
-                    "Use industry template for faster setup",
-                  ].map((rec, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-card border border-border rounded-md px-3 py-2 text-xs font-mono text-muted-foreground transition-all duration-200 hover:border-primary/30 hover:text-foreground hover:shadow-sm cursor-pointer group">
-                      <ArrowRight className="w-3 h-3 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                      {rec}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {active.status === "in_progress" && (
-              <Button onClick={() => completeStep(active.id)} className="font-mono text-sm">
-                Mark Complete ✓
-              </Button>
-            )}
-            {active.status === "completed" && (
-              <p className="text-sm text-primary font-mono flex items-center gap-1">
-                <CheckCircle className="w-4 h-4" /> Completed
-              </p>
-            )}
-          </div>
+          <StepContent step={active} onComplete={completeStep} />
         )}
       </div>
 
