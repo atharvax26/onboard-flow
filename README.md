@@ -196,16 +196,24 @@ onboard-flow/
 │   ├── hooks/                   # Custom React hooks
 │   ├── lib/                     # Utilities and API client
 │   ├── pages/                   # Page components
+│   ├── test/                    # Test files and setup
+│   ├── App.tsx                  # Main app component
 │   └── main.tsx                 # Application entry point
 ├── server/                       # Backend Express API
 │   ├── src/
 │   │   ├── middleware/          # Auth middleware
 │   │   ├── routes/              # API routes
 │   │   ├── services/            # Business logic (DB, Gemini)
+│   │   ├── types/               # TypeScript type definitions
 │   │   └── index.ts             # Server entry point
-│   └── data/                    # JSON database storage
+│   ├── data/                    # JSON database storage
+│   └── package.json             # Server dependencies
 ├── public/                       # Static assets
 ├── start-dev.bat                # Windows startup script
+├── DOCUMENTATION.md             # Technical documentation
+├── PROJECT_DESCRIPTION.md       # Complete feature list
+├── EXECUTIVE_SUMMARY.md         # Quick overview and ROI
+├── CHANGELOG.md                 # Version history
 └── README.md                    # This file
 ```
 
