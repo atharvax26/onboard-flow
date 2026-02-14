@@ -3,18 +3,34 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const [form, setForm] = useState({ email: "", password: "", name: "", company: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.email || !form.password || !form.name) { setError("All fields required"); return; }
-    register(form.email, form.password, form.name, form.company);
-    navigate("/dashboard");
+    
+    setLoading(true);
+    setError("");
+    
+    try {
+      const ok = await register(form.email, form.password, form.name, form.company);
+      if (ok) {
+        navigate("/dashboard");
+      } else {
+        setError("Registration failed");
+      }
+    } catch (err) {
+      setError("Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -37,7 +53,16 @@ export default function RegisterPage() {
               </div>
             ))}
             {error && <p className="text-xs text-destructive font-mono">{error}</p>}
-            <Button type="submit" className="w-full font-mono text-sm">Create Account →</Button>
+            <Button type="submit" className="w-full font-mono text-sm" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Create Account →"
+              )}
+            </Button>
             <p className="text-xs text-center text-muted-foreground">
               Have an account? <Link to="/login" className="text-primary hover:underline">Login</Link>
             </p>

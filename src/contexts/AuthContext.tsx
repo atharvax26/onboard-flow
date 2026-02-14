@@ -1,64 +1,74 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { User } from "@/lib/types";
-import { MOCK_USERS } from "@/lib/mock-data";
+import { api, getAuthToken, clearAuthToken } from "@/lib/api";
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
-  register: (email: string, password: string, name: string, company: string) => boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (email: string, password: string, name: string, company: string) => Promise<boolean>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAdmin: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (email: string, _password: string): boolean => {
-    const found = MOCK_USERS.find((u) => u.email === email);
-    if (found) {
-      setUser(found);
-      return true;
+  // Check for existing auth token on mount
+  useEffect(() => {
+    const token = getAuthToken();
+    if (token) {
+      // Token exists, but we need to validate it by fetching user data
+      // For now, we'll just set loading to false
+      // In a real app, you'd validate the token with the backend
     }
-    // Allow any email to login as a new user
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      email,
-      name: email.split("@")[0],
-      company: "New Company",
-      role: "user",
-      onboardingStatus: "not_started",
-      completionPercent: 0,
-      currentStep: 0,
-      lastActivity: new Date().toISOString(),
-      documentsUploaded: [],
-    };
-    setUser(newUser);
-    return true;
+    setLoading(false);
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const response = await api.login(email, password);
+      setUser(response.user);
+      return true;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
+    }
   };
 
-  const register = (email: string, _password: string, name: string, company: string): boolean => {
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      email,
-      name,
-      company,
-      role: email === "admin@demo.com" ? "admin" : "user",
-      onboardingStatus: "not_started",
-      completionPercent: 0,
-      currentStep: 0,
-      lastActivity: new Date().toISOString(),
-      documentsUploaded: [],
-    };
-    setUser(newUser);
-    return true;
+  const register = async (email: string, password: string, name: string, company: string): Promise<boolean> => {
+    try {
+      const response = await api.register(email, password, name, company);
+      setUser(response.user);
+      return true;
+    } catch (error) {
+      console.error('Registration failed:', error);
+      return false;
+    }
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    setUser(null);
+    clearAuthToken();
+  };
+
+  const refreshUser = async () => {
+    if (!user) return;
+    
+    try {
+      const updatedUser = await api.getUser(user.email);
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAdmin: user?.role === "admin" }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, isAdmin: user?.role === "admin", loading }}>
       {children}
     </AuthContext.Provider>
   );

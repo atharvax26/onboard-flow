@@ -1,32 +1,71 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { MOCK_ACTIVITY, MOCK_USERS } from "@/lib/mock-data";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, Activity, ArrowRight, Users, CheckCircle2 } from "lucide-react";
-
-const ADMIN_ACTIVITY = [
-  { id: "aa1", action: "Jane Cooper", detail: "Completed step: Integration Configuration", time: "1 hour ago" },
-  { id: "aa2", action: "Bob Builder", detail: "Uploaded document: startup-onboard.pdf", time: "2 hours ago" },
-  { id: "aa3", action: "Mike Design", detail: "Completed step: Training & Certification", time: "3 hours ago" },
-  { id: "aa4", action: "Sara Smith", detail: "Registered — onboarding not started", time: "5 hours ago" },
-  { id: "aa5", action: "Lisa Wong", detail: "Completed all onboarding steps", time: "1 day ago" },
-];
+import { Upload, FileText, Activity, ArrowRight, Users, CheckCircle2, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User } from "@/lib/types";
 
 export default function DashboardPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const [adminActivity, setAdminActivity] = useState<any[]>([]);
+  const [userActivity, setUserActivity] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!user) return;
+
+      try {
+        // Refresh user data first
+        await refreshUser();
+        
+        if (isAdmin) {
+          // Load admin data
+          const [allUsers, activity] = await Promise.all([
+            api.getAllUsers(),
+            api.getAdminActivity()
+          ]);
+          setUsers(allUsers.filter(u => u.role === "user"));
+          setAdminActivity(activity);
+        } else {
+          // Load user activity
+          const activity = await api.getUserActivity(user.email);
+          setUserActivity(activity);
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [user, isAdmin, refreshUser]);
 
   if (!user) return null;
 
-  if (isAdmin) {
-    const totalUsers = MOCK_USERS.filter((u) => u.role === "user").length;
-    const activeUsers = MOCK_USERS.filter((u) => u.onboardingStatus === "in_progress").length;
-    const completedUsers = MOCK_USERS.filter((u) => u.onboardingStatus === "completed").length;
-    const avgCompletion = Math.round(
-      MOCK_USERS.filter((u) => u.role === "user").reduce((sum, u) => sum + u.completionPercent, 0) / totalUsers
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm font-mono text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
     );
+  }
+
+  if (isAdmin) {
+    const totalUsers = users.length;
+    const activeUsers = users.filter((u) => u.onboardingStatus === "in_progress").length;
+    const completedUsers = users.filter((u) => u.onboardingStatus === "completed").length;
+    const avgCompletion = totalUsers > 0 
+      ? Math.round(users.reduce((sum, u) => sum + u.completionPercent, 0) / totalUsers)
+      : 0;
 
     return (
       <div className="p-6 md:p-8 space-y-6 pattern-grid min-h-[60vh]">
@@ -91,16 +130,20 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {ADMIN_ACTIVITY.map((a) => (
-                <div key={a.id} className="flex items-center gap-3 text-sm border-b border-border pb-2 last:border-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <span className="font-medium">{a.action}</span>
-                  <span className="text-muted-foreground font-mono text-xs">{a.detail}</span>
-                  <span className="text-muted-foreground text-xs ml-auto">{a.time}</span>
-                </div>
-              ))}
-            </div>
+            {adminActivity.length > 0 ? (
+              <div className="space-y-3">
+                {adminActivity.slice(0, 5).map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 text-sm border-b border-border pb-2 last:border-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                    <span className="font-medium">{a.action}</span>
+                    <span className="text-muted-foreground font-mono text-xs">{a.detail}</span>
+                    <span className="text-muted-foreground text-xs ml-auto">{a.time}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No activity yet</p>
+            )}
           </CardContent>
         </Card>
 
@@ -169,16 +212,20 @@ export default function DashboardPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {MOCK_ACTIVITY.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 text-sm border-b border-border pb-2 last:border-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <span className="font-medium">{a.action}</span>
-                <span className="text-muted-foreground font-mono text-xs">{a.detail}</span>
-                <span className="text-muted-foreground text-xs ml-auto">{a.time}</span>
-              </div>
-            ))}
-          </div>
+          {userActivity.length > 0 ? (
+            <div className="space-y-3">
+              {userActivity.slice(0, 5).map((a) => (
+                <div key={a.id} className="flex items-center gap-3 text-sm border-b border-border pb-2 last:border-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  <span className="font-medium">{a.action}</span>
+                  <span className="text-muted-foreground font-mono text-xs">{a.detail}</span>
+                  <span className="text-muted-foreground text-xs ml-auto">{a.time}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No activity yet</p>
+          )}
         </CardContent>
       </Card>
 

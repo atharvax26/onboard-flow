@@ -1,12 +1,70 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { FileText, Shield, Users, Activity } from "lucide-react";
-import { MOCK_USERS } from "@/lib/mock-data";
+import { Button } from "@/components/ui/button";
+import { FileText, Shield, Users, Activity, Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function AccountPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, refreshUser } = useAuth();
+  const { toast } = useToast();
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userSteps, setUserSteps] = useState<any[]>([]);
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!user) return;
+
+      try {
+        // Refresh user data first
+        await refreshUser();
+        
+        if (isAdmin) {
+          // Load all users for admin
+          const users = await api.getAllUsers();
+          setAllUsers(users);
+        } else {
+          // Load user's steps to get accurate step count
+          const steps = await api.getSteps(user.email);
+          setUserSteps(steps);
+        }
+      } catch (error) {
+        console.error('Failed to load account data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [user, isAdmin, refreshUser]);
+
   if (!user) return null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm font-mono text-muted-foreground">Loading account details...</p>
+        </div>
+      </div>
+    );
+  }
 
   const profileFields = [
     { label: "Name", value: user.name },
@@ -16,9 +74,35 @@ export default function AccountPage() {
     { label: "User ID", value: user.id.slice(0, 8) },
   ];
 
-  const totalUsers = MOCK_USERS.length;
-  const completedUsers = MOCK_USERS.filter(u => u.onboardingStatus === "completed").length;
-  const activeUsers = MOCK_USERS.filter(u => u.onboardingStatus === "in_progress").length;
+  const regularUsers = allUsers.filter(u => u.role === "user");
+  const totalUsers = regularUsers.length;
+  const completedUsers = regularUsers.filter(u => u.onboardingStatus === "completed").length;
+  const activeUsers = regularUsers.filter(u => u.onboardingStatus === "in_progress").length;
+  const totalSteps = userSteps.length;
+
+  const handleClearDatabase = async () => {
+    setClearing(true);
+    try {
+      await api.clearDatabase();
+      toast({
+        title: "Database Cleared",
+        description: "All user data has been removed successfully",
+      });
+      // Reload the data
+      const users = await api.getAllUsers();
+      setAllUsers(users);
+      setShowClearDialog(false);
+    } catch (error) {
+      console.error('Failed to clear database:', error);
+      toast({
+        title: "Clear Failed",
+        description: "Failed to clear database. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setClearing(false);
+    }
+  };
 
   return (
     <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6 min-h-[60vh]">
@@ -72,20 +156,82 @@ export default function AccountPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {MOCK_USERS.filter(u => u.role !== "admin").map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 p-2 rounded border border-border bg-background">
-                    <Activity className="w-4 h-4 text-primary" />
-                    <div className="flex-1">
-                      <p className="text-sm font-mono">{u.name}</p>
-                      <p className="text-[10px] font-mono text-muted-foreground">{u.company} · {u.onboardingStatus.replace("_", " ")}</p>
+              {regularUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {regularUsers.map((u) => (
+                    <div key={u.email} className="flex items-center gap-3 p-2 rounded border border-border bg-background">
+                      <Activity className="w-4 h-4 text-primary" />
+                      <div className="flex-1">
+                        <p className="text-sm font-mono">{u.name}</p>
+                        <p className="text-[10px] font-mono text-muted-foreground">{u.company} · {u.onboardingStatus.replace("_", " ")}</p>
+                      </div>
+                      <span className="text-xs font-mono text-muted-foreground">{u.completionPercent}%</span>
                     </div>
-                    <span className="text-xs font-mono text-muted-foreground">{u.completionPercent}%</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground font-mono">No users registered yet</p>
+              )}
             </CardContent>
           </Card>
+
+          {/* Clear Database Section */}
+          <Card className="animate-slide-up border-destructive/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-mono uppercase text-destructive tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5" /> Danger Zone
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Clear all user data, documents, and onboarding progress. This action cannot be undone.
+              </p>
+              <Button
+                variant="destructive"
+                onClick={() => setShowClearDialog(true)}
+                disabled={clearing}
+                className="w-full font-mono text-sm"
+              >
+                {clearing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Clearing...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear Database
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Confirmation Dialog */}
+          <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  Clear Database?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete all user accounts, documents, onboarding steps, and activity logs.
+                  The admin account will be preserved. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={clearing}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClearDatabase}
+                  disabled={clearing}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {clearing ? "Clearing..." : "Yes, Clear Database"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       ) : (
         <>
@@ -100,8 +246,10 @@ export default function AccountPage() {
                 <span className="text-sm font-mono">{user.completionPercent}%</span>
                 <span className="text-[10px] font-mono text-muted-foreground uppercase">Status</span>
                 <span className="text-sm font-mono capitalize">{user.onboardingStatus.replace("_", " ")}</span>
-                <span className="text-[10px] font-mono text-muted-foreground uppercase">Step</span>
-                <span className="text-sm font-mono">{user.currentStep} / 8</span>
+                <span className="text-[10px] font-mono text-muted-foreground uppercase">Steps</span>
+                <span className="text-sm font-mono">
+                  {userSteps.filter(s => s.status === "completed").length} / {totalSteps}
+                </span>
               </div>
             </CardContent>
           </Card>

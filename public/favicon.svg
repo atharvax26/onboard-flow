@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#0BA5A4" stroke="#0BA5A4" stroke-width="2"/>
+  
+  <!-- Checkmark path representing completion/onboarding -->
+  <path d="M 30 50 L 42 62 L 70 34" 
+        stroke="white" 
+        stroke-width="8" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        fill="none"/>
+  
+  <!-- Small sparkle/AI indicator -->
+  <circle cx="75" cy="25" r="3" fill="white"/>
+  <path d="M 75 18 L 75 32 M 68 25 L 82 25" 
+        stroke="white" 
+        stroke-width="2" 
+        stroke-linecap="round"/>
+</svg>

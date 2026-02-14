@@ -3,20 +3,35 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError("All fields required"); return; }
-    const ok = login(email, password);
-    if (ok) navigate("/dashboard");
-    else setError("Invalid credentials");
+    
+    setLoading(true);
+    setError("");
+    
+    try {
+      const ok = await login(email, password);
+      if (ok) {
+        navigate("/dashboard");
+      } else {
+        setError("Invalid credentials");
+      }
+    } catch (err) {
+      setError("Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -36,7 +51,16 @@ export default function LoginPage() {
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="mt-1 font-mono text-sm" />
             </div>
             {error && <p className="text-xs text-destructive font-mono">{error}</p>}
-            <Button type="submit" className="w-full font-mono text-sm">Login →</Button>
+            <Button type="submit" className="w-full font-mono text-sm" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                "Login →"
+              )}
+            </Button>
             <p className="text-xs text-center text-muted-foreground">
               No account? <Link to="/register" className="text-primary hover:underline">Register</Link>
             </p>
