@@ -38,8 +38,9 @@ export const CHANGELOG = [
 ];
 
 export const FAQ_ITEMS = [
-  { q: "How does the AI parse onboarding documents?", a: "Our system analyzes uploaded PDF documents using natural language processing to extract actionable onboarding steps, requirements, and dependencies automatically." },
-  { q: "Can I customize the generated onboarding steps?", a: "Yes. After AI parsing, you can edit, reorder, add, or remove any steps. The system provides a starting point that you can fully customize." },
-  { q: "What file formats are supported?", a: "Currently we support PDF documents. Upload your company's onboarding handbook, policy documents, or process guides in PDF format." },
-  { q: "How does the admin analytics work?", a: "Admin users can track all users' onboarding progress, identify bottleneck steps, view completion rates, and export detailed reports." },
+  { q: "How does the AI parse onboarding documents?", a: "Our system uses Google Gemini AI to analyze uploaded PDF documents. It extracts text content, identifies key topics, and automatically generates structured onboarding steps with detailed instructions and logical sequencing." },
+  { q: "What file formats are supported?", a: "Currently we support PDF documents. Upload your company's onboarding handbook, employee policies, training materials, or process guides in PDF format for AI analysis." },
+  { q: "How does the chatbot assistant work?", a: "The AI chatbot has full context of your current step, all onboarding steps, and the original document content. It provides instant, relevant answers 24/7 to help users complete their onboarding without waiting for support." },
+  { q: "What happens when I complete all steps?", a: "Upon 100% completion, you'll see a celebration animation with confetti and trophy. Your completed flow is automatically archived to the history section, and you can download a professional PDF completion report anytime." },
+  { q: "How does progress tracking work?", a: "The system tracks your completion percentage in real-time and assigns a maturity level: Startup (0-25%), Growing (26-50%), Established (51-75%), or Enterprise Ready (76-100%). All progress is automatically saved and survives server restarts." },
 ];
