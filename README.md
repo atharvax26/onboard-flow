@@ -2,7 +2,7 @@
 
 > Transform Company Documents into AI-Powered Onboarding Experiences
 
-An intelligent onboarding platform that uses Google Gemini AI to automatically analyze company documents and generate personalized, adaptive onboarding workflows. Upload a PDF, get a complete onboarding experience in minutes.
+An intelligent onboarding platform that uses AI to automatically analyze company documents and generate personalized, adaptive onboarding workflows. Upload a PDF, get a complete onboarding experience in minutes.
 
 ---
 
