@@ -137,10 +137,14 @@ export default function OnboardingPage() {
           setShowCompletionAnimation(true);
           
           // Prepare the completed flow data
+          const mostRecentDoc = user.documentsUploaded && user.documentsUploaded.length > 0 
+            ? user.documentsUploaded[user.documentsUploaded.length - 1] 
+            : null;
+          
           const flowData = {
             id: `flow-${Date.now()}`,
-            documentName: user.documentName || "Onboarding.pdf",
-            documentId: user.documentId || "doc-" + Date.now(),
+            documentName: mostRecentDoc?.name || "Onboarding.pdf",
+            documentId: mostRecentDoc?.id || "doc-" + Date.now(),
             steps: updated,
             completedAt: new Date().toISOString(),
             completionPercent: 100
@@ -386,7 +390,7 @@ export default function OnboardingPage() {
         {/* Chatbot for general questions even without steps */}
         <OnboardingChatbot 
           allSteps={[]}
-          documentName={user?.documentName}
+          documentName={user?.documentsUploaded?.[user.documentsUploaded.length - 1]?.name}
         />
       </div>
     );
@@ -694,7 +698,7 @@ export default function OnboardingPage() {
       <OnboardingChatbot 
         currentStep={active}
         allSteps={steps}
-        documentName={user?.documentName}
+        documentName={user?.documentsUploaded?.[user.documentsUploaded.length - 1]?.name}
       />
     )}
   </>
