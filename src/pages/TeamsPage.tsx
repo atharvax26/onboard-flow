@@ -565,11 +565,14 @@ export default function TeamsPage() {
               <Input
                 id="member-email"
                 type="email"
-                placeholder="user@example.com"
+                placeholder="username@gmail.com"
                 value={memberEmail}
                 onChange={(e) => setMemberEmail(e.target.value)}
                 className="font-mono"
               />
+              <p className="text-xs text-muted-foreground">
+                Only registered users with Gmail addresses can be added
+              </p>
             </div>
           </div>
           <DialogFooter>

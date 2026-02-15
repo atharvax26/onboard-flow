@@ -14,7 +14,16 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email || !form.password || !form.name) { setError("All fields required"); return; }
+    if (!form.email || !form.password || !form.name) { 
+      setError("All fields required"); 
+      return; 
+    }
+    
+    // Validate email format - must end with @gmail.com
+    if (!form.email.toLowerCase().endsWith('@gmail.com')) {
+      setError("Email must be a Gmail address (@gmail.com)");
+      return;
+    }
     
     setLoading(true);
     setError("");
@@ -45,10 +54,11 @@ export default function RegisterPage() {
               <div key={field}>
                 <label className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">{field}</label>
                 <Input
-                  type={field === "password" ? "password" : "text"}
+                  type={field === "password" ? "password" : field === "email" ? "email" : "text"}
                   value={form[field]}
                   onChange={(e) => setForm({ ...form, [field]: e.target.value })}
                   className="mt-1 font-mono text-sm"
+                  placeholder={field === "email" ? "username@gmail.com" : ""}
                 />
               </div>
             ))}
