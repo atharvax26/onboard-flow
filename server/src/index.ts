@@ -332,6 +332,93 @@ app.delete('/api/archived-flows/:userId/:flowId', authenticateToken, (req: AuthR
   res.json({ success: true, message: 'Archived flow deleted successfully' });
 });
 
+// Teams endpoints (admin only)
+
+// Get all teams
+app.get('/api/teams', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const teams = db.getAllTeams();
+  res.json(teams);
+});
+
+// Create team
+app.post('/api/teams', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { name, description } = req.body;
+  
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Team name is required' });
+  }
+  
+  const team = db.createTeam(name.trim(), description?.trim() || '', req.user!.email);
+  res.json(team);
+});
+
+// Add member to team
+app.post('/api/teams/:teamId/members', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { teamId } = req.params;
+  const { email } = req.body;
+  
+  if (!email || !email.trim()) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Invalid email address' });
+  }
+  
+  try {
+    const team = db.addTeamMember(teamId, email.trim());
+    res.json(team);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to add member' });
+  }
+});
+
+// Remove member from team
+app.delete('/api/teams/:teamId/members/:email', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { teamId, email } = req.params;
+  
+  try {
+    const team = db.removeTeamMember(teamId, decodeURIComponent(email));
+    res.json(team);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to remove member' });
+  }
+});
+
+// Delete team
+app.delete('/api/teams/:teamId', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { teamId } = req.params;
+  
+  const deleted = db.deleteTeam(teamId);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Team not found' });
+  }
+  
+  res.json({ success: true, message: 'Team deleted successfully' });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

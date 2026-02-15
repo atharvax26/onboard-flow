@@ -45,12 +45,22 @@ interface ArchivedFlow {
   completionPercent: number;
 }
 
+interface Team {
+  id: string;
+  name: string;
+  description: string;
+  members: string[]; // Array of email addresses
+  createdAt: string;
+  createdBy: string;
+}
+
 interface DatabaseData {
   users: [string, User][];
   steps: [string, OnboardingStep[]][];
   archivedFlows: [string, ArchivedFlow[]][];
   activities: [string, Activity[]][];
   adminActivities: Activity[];
+  teams: Team[];
 }
 
 class Database {
@@ -59,6 +69,7 @@ class Database {
   private archivedFlows: Map<string, ArchivedFlow[]> = new Map(); // userId -> archived flows
   private activities: Map<string, Activity[]> = new Map();
   private adminActivities: Activity[] = [];
+  private teams: Team[] = [];
 
   constructor() {
     // Load data from file if it exists
@@ -407,6 +418,81 @@ class Database {
     return `${Math.floor(seconds / 86400)} days ago`;
   }
 
+  // Team management methods
+  getAllTeams(): Team[] {
+    return this.teams;
+  }
+
+  createTeam(name: string, description: string, createdBy: string): Team {
+    const team: Team = {
+      id: `team-${Date.now()}`,
+      name,
+      description,
+      members: [],
+      createdAt: new Date().toISOString(),
+      createdBy
+    };
+    
+    this.teams.push(team);
+    this.addAdminActivity('Admin', `Created team: ${name}`);
+    this.persistChanges();
+    
+    console.log(`✅ Team created: ${name}`);
+    return team;
+  }
+
+  addTeamMember(teamId: string, email: string): Team {
+    const team = this.teams.find(t => t.id === teamId);
+    if (!team) {
+      throw new Error('Team not found');
+    }
+    
+    if (team.members.includes(email)) {
+      throw new Error('User is already a member of this team');
+    }
+    
+    team.members.push(email);
+    this.addAdminActivity('Admin', `Added ${email} to team: ${team.name}`);
+    this.persistChanges();
+    
+    console.log(`✅ Added member ${email} to team: ${team.name}`);
+    return team;
+  }
+
+  removeTeamMember(teamId: string, email: string): Team {
+    const team = this.teams.find(t => t.id === teamId);
+    if (!team) {
+      throw new Error('Team not found');
+    }
+    
+    const index = team.members.indexOf(email);
+    if (index === -1) {
+      throw new Error('User is not a member of this team');
+    }
+    
+    team.members.splice(index, 1);
+    this.addAdminActivity('Admin', `Removed ${email} from team: ${team.name}`);
+    this.persistChanges();
+    
+    console.log(`✅ Removed member ${email} from team: ${team.name}`);
+    return team;
+  }
+
+  deleteTeam(teamId: string): boolean {
+    const index = this.teams.findIndex(t => t.id === teamId);
+    if (index === -1) {
+      return false;
+    }
+    
+    const team = this.teams[index];
+    this.teams.splice(index, 1);
+    this.addAdminActivity('Admin', `Deleted team: ${team.name}`);
+    this.persistChanges();
+    
+    console.log(`✅ Team deleted: ${team.name}`);
+    return true;
+  }
+
   // Persistence methods
   private loadFromFile(): void {
     try {
@@ -420,11 +506,13 @@ class Database {
         this.archivedFlows = new Map(parsed.archivedFlows);
         this.activities = new Map(parsed.activities);
         this.adminActivities = parsed.adminActivities || [];
+        this.teams = parsed.teams || [];
         
         console.log('✅ Database loaded from file');
         console.log(`   Users: ${this.users.size}`);
         console.log(`   Steps: ${this.steps.size}`);
         console.log(`   Archived flows: ${this.archivedFlows.size}`);
+        console.log(`   Teams: ${this.teams.length}`);
       } else {
         console.log('📝 No existing database file, starting fresh');
       }
@@ -448,7 +536,8 @@ class Database {
         steps: Array.from(this.steps.entries()),
         archivedFlows: Array.from(this.archivedFlows.entries()),
         activities: Array.from(this.activities.entries()),
-        adminActivities: this.adminActivities
+        adminActivities: this.adminActivities,
+        teams: this.teams
       };
 
       fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
