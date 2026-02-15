@@ -26,6 +26,8 @@ export default function AccountPage() {
   const [userSteps, setUserSteps] = useState<any[]>([]);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -104,6 +106,46 @@ export default function AccountPage() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    
+    setDeleting(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${deletingUser.email}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete user');
+      }
+
+      // Remove user from local state
+      setAllUsers(users => users.filter(u => u.email !== deletingUser.email));
+      
+      toast({
+        title: "User Deleted",
+        description: `${deletingUser.name} has been removed from the system`,
+      });
+      
+      setDeletingUser(null);
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      toast({
+        title: "Delete Failed",
+        description: error instanceof Error ? error.message : "Failed to delete user",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6 min-h-[60vh]">
       <div className="animate-slide-up">
@@ -159,13 +201,22 @@ export default function AccountPage() {
               {regularUsers.length > 0 ? (
                 <div className="space-y-2">
                   {regularUsers.map((u) => (
-                    <div key={u.email} className="flex items-center gap-3 p-2 rounded border border-border bg-background">
+                    <div key={u.email} className="group flex items-center gap-3 p-2 rounded border border-border bg-background hover:border-primary/30 transition-colors relative">
                       <Activity className="w-4 h-4 text-primary" />
                       <div className="flex-1">
                         <p className="text-sm font-mono">{u.name}</p>
                         <p className="text-[10px] font-mono text-muted-foreground">{u.company} · {u.onboardingStatus.replace("_", " ")}</p>
                       </div>
                       <span className="text-xs font-mono text-muted-foreground">{u.completionPercent}%</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeletingUser(u)}
+                        title="Delete user"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -228,6 +279,36 @@ export default function AccountPage() {
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   {clearing ? "Clearing..." : "Yes, Clear Database"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Delete User Confirmation Dialog */}
+          <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete User?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete <span className="font-mono font-semibold">{deletingUser?.name}</span> ({deletingUser?.email})? 
+                  This will permanently remove their account, documents, and onboarding progress. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteUser}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete User"
+                  )}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

@@ -265,6 +265,41 @@ class Database {
     this.persistChanges();
   }
 
+  deleteUser(userId: string): boolean {
+    console.log(`🗑️ Deleting user: ${userId}`);
+    
+    const user = this.users.get(userId);
+    if (!user) {
+      console.log(`   ❌ User not found`);
+      return false;
+    }
+    
+    // Prevent deleting admin
+    if (user.role === 'admin') {
+      console.log(`   ❌ Cannot delete admin user`);
+      return false;
+    }
+    
+    // Delete user
+    this.users.delete(userId);
+    
+    // Delete user's steps
+    this.steps.delete(userId);
+    
+    // Delete user's archived flows
+    this.archivedFlows.delete(userId);
+    
+    // Delete user's activities
+    this.activities.delete(userId);
+    
+    // Add admin activity
+    this.addAdminActivity('Admin', `Deleted user: ${user.name} (${user.email})`);
+    
+    console.log(`   ✅ User and all associated data deleted`);
+    this.persistChanges();
+    return true;
+  }
+
   getArchivedFlows(userId: string): ArchivedFlow[] {
     return this.archivedFlows.get(userId) || [];
   }

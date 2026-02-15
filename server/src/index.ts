@@ -211,6 +211,30 @@ app.delete('/api/admin/clear-database', authenticateToken, (req: AuthRequest, re
   res.json({ success: true, message: 'Database cleared successfully' });
 });
 
+// Delete user (admin only)
+app.delete('/api/user/:userId', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  
+  // Prevent deleting admin account
+  const user = db.getUser(userId);
+  if (user && user.role === 'admin') {
+    return res.status(403).json({ error: 'Cannot delete admin account' });
+  }
+  
+  const deleted = db.deleteUser(userId);
+  
+  if (!deleted) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  console.log(`🗑️ User deleted by admin: ${userId}`);
+  res.json({ success: true, message: 'User deleted successfully' });
+});
+
 // Get archived onboarding flows (requires authentication)
 app.get('/api/archived-flows/:userId', authenticateToken, (req: AuthRequest, res) => {
   const { userId } = req.params;
