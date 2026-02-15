@@ -57,22 +57,36 @@ export default function UploadPage() {
       }
 
       try {
-        const userData = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${user.email}`, {
+        console.log('📄 Loading documents for user:', user.email);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${user.email}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           }
-        }).then(r => r.json());
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+
+        const userData = await response.json();
+        console.log('📦 User data received:', userData);
+        console.log('📚 Documents uploaded:', userData.documentsUploaded);
         
         setDocuments(userData.documentsUploaded || []);
       } catch (error) {
-        console.error('Failed to load documents:', error);
+        console.error('❌ Failed to load documents:', error);
+        toast({
+          title: "Failed to load documents",
+          description: error instanceof Error ? error.message : "Unknown error",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
     }
 
     loadDocuments();
-  }, [user]);
+  }, [user, toast]);
 
   const handleFile = useCallback((f: File) => {
     if (!f.name.endsWith(".pdf")) {
@@ -299,7 +313,12 @@ export default function UploadPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {documents.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 text-primary mx-auto mb-3 animate-spin" />
+                  <p className="text-sm text-muted-foreground font-mono">Loading documents...</p>
+                </div>
+              ) : documents.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
                   <p className="text-sm text-muted-foreground font-mono">No documents uploaded yet</p>
