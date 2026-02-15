@@ -13,6 +13,7 @@ import UploadPage from "@/pages/UploadPage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import AccountPage from "@/pages/AccountPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
+import TeamsPage from "@/pages/TeamsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ function AppRoutes() {
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
         <Route path="/analytics" element={<AdminRoute><AnalyticsPage /></AdminRoute>} />
+        <Route path="/teams" element={<AdminRoute><TeamsPage /></AdminRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserChrome>

@@ -14,6 +14,7 @@ const ADMIN_TABS = [
   { label: "Home", path: "/dashboard" },
   { label: "Document Upload", path: "/upload" },
   { label: "Account Details", path: "/account" },
+  { label: "Teams", path: "/teams" },
   { label: "Analytics", path: "/analytics" },
 ];
 
