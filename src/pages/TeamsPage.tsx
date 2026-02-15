@@ -42,6 +42,12 @@ interface Team {
   createdBy: string;
 }
 
+interface UserInfo {
+  email: string;
+  name: string;
+  company: string;
+}
+
 export default function TeamsPage() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -51,6 +57,7 @@ export default function TeamsPage() {
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null);
+  const [userInfoMap, setUserInfoMap] = useState<Map<string, UserInfo>>(new Map());
   
   // Form states
   const [teamName, setTeamName] = useState("");
@@ -90,6 +97,43 @@ export default function TeamsPage() {
 
       const data = await response.json();
       setTeams(data);
+      
+      // Load user info for all team members
+      const allEmails = new Set<string>();
+      data.forEach((team: Team) => {
+        team.members.forEach((email: string) => allEmails.add(email));
+      });
+      
+      // Fetch user info for all unique emails
+      const userInfoPromises = Array.from(allEmails).map(async (email) => {
+        try {
+          const userResponse = await fetch(
+            `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${email}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+              }
+            }
+          );
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            return { email, info: { email: userData.email, name: userData.name, company: userData.company } };
+          }
+        } catch (error) {
+          console.error(`Failed to load user info for ${email}:`, error);
+        }
+        return null;
+      });
+      
+      const userInfoResults = await Promise.all(userInfoPromises);
+      const newUserInfoMap = new Map<string, UserInfo>();
+      userInfoResults.forEach(result => {
+        if (result) {
+          newUserInfoMap.set(result.email, result.info);
+        }
+      });
+      setUserInfoMap(newUserInfoMap);
+      
     } catch (error) {
       console.error('Failed to load teams:', error);
       toast({
@@ -198,6 +242,28 @@ export default function TeamsPage() {
 
       const updatedTeam = await response.json();
       setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
+      
+      // Load user info for the newly added member
+      try {
+        const userResponse = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${memberEmail}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+          }
+        );
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setUserInfoMap(prev => new Map(prev).set(memberEmail, {
+            email: userData.email,
+            name: userData.name,
+            company: userData.company
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+      }
       
       toast({
         title: "Member Added",
@@ -387,25 +453,37 @@ export default function TeamsPage() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {team.members.map((email) => (
-                        <div
-                          key={email}
-                          className="group flex items-center justify-between p-2 rounded border border-border bg-background hover:border-primary/30 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span className="text-sm font-mono">{email}</span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => handleRemoveMember(team.id, email)}
+                      {team.members.map((email) => {
+                        const userInfo = userInfoMap.get(email);
+                        return (
+                          <div
+                            key={email}
+                            className="group flex items-center justify-between p-2 rounded border border-border bg-background hover:border-primary/30 transition-colors"
                           >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                {userInfo ? (
+                                  <>
+                                    <p className="text-sm font-mono truncate">{userInfo.name}</p>
+                                    <p className="text-xs text-muted-foreground font-mono truncate">{email} · {userInfo.company}</p>
+                                  </>
+                                ) : (
+                                  <span className="text-sm font-mono truncate">{email}</span>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                              onClick={() => handleRemoveMember(team.id, email)}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

@@ -379,6 +379,12 @@ app.post('/api/teams/:teamId/members', authenticateToken, (req: AuthRequest, res
     return res.status(400).json({ error: 'Invalid email address' });
   }
   
+  // Check if user with this email exists
+  const user = db.getUser(email.trim());
+  if (!user) {
+    return res.status(404).json({ error: 'User not found. Only registered users can be added to teams.' });
+  }
+  
   try {
     const team = db.addTeamMember(teamId, email.trim());
     res.json(team);

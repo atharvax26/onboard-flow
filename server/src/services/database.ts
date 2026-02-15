@@ -451,11 +451,15 @@ class Database {
       throw new Error('User is already a member of this team');
     }
     
+    // Get user info for better logging
+    const user = this.getUser(email);
+    const userName = user ? user.name : email;
+    
     team.members.push(email);
-    this.addAdminActivity('Admin', `Added ${email} to team: ${team.name}`);
+    this.addAdminActivity('Admin', `Added ${userName} (${email}) to team: ${team.name}`);
     this.persistChanges();
     
-    console.log(`✅ Added member ${email} to team: ${team.name}`);
+    console.log(`✅ Added member ${userName} (${email}) to team: ${team.name}`);
     return team;
   }
 
