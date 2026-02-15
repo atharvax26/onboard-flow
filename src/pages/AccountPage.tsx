@@ -207,15 +207,16 @@ export default function AccountPage() {
                         <p className="text-sm font-mono">{u.name}</p>
                         <p className="text-[10px] font-mono text-muted-foreground">{u.company} · {u.onboardingStatus.replace("_", " ")}</p>
                       </div>
-                      <span className="text-xs font-mono text-muted-foreground">{u.completionPercent}%</span>
+                      <span className="text-xs font-mono text-muted-foreground group-hover:opacity-0 transition-opacity">{u.completionPercent}%</span>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="absolute right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="absolute right-2 h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 flex items-center gap-1"
                         onClick={() => setDeletingUser(u)}
                         title="Delete user"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
+                        <span className="text-xs font-mono">Delete</span>
                       </Button>
                     </div>
                   ))}
