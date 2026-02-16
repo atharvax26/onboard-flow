@@ -39,23 +39,33 @@ Traditional onboarding is broken:
 - **Context-Aware Chatbot** - 24/7 assistant that knows your documents and current progress
 - **Adaptive Instructions** - Detailed, actionable guidance for each step
 
+### 👥 Team Management
+- **Team Creation** - Organize users into teams for collaborative onboarding
+- **Team-Based Documents** - Upload documents specific to teams
+- **Document Queue System** - Queue multiple documents per team for sequential processing
+- **Member Management** - Add/remove team members with real-time notifications
+- **Team Notifications** - Instant alerts when added to or removed from teams
+
 ### 📊 Progress & Analytics
 - **Real-Time Tracking** - See completion percentage and time spent
 - **Maturity Scoring** - From Startup (0-25%) to Enterprise Ready (76-100%)
-- **Activity Feed** - Track all user actions and milestones
+- **Activity Feed** - Track all user actions and milestones with accurate timestamps
 - **Admin Dashboard** - Monitor users, completion rates, and system usage
+- **User Analytics** - Detailed analytics per user with step-by-step progress
 
 ### 🎉 Engaging Experience
 - **Three-Panel Interface** - Sidebar (steps), main content (details), properties panel
 - **Celebration Animations** - Trophy and confetti on completion
 - **Onboarding History** - Archive completed flows and download PDF reports
 - **Responsive Design** - Works seamlessly on all devices
+- **Document Queue UI** - Visual queue management with play/pause controls
 
 ### 🔒 Enterprise-Ready
 - **Secure Authentication** - JWT tokens with bcrypt password hashing
-- **Role-Based Access** - Admin and user roles
-- **Data Persistence** - All data survives server restarts
-- **Document Management** - Multiple documents per user with easy deletion
+- **Role-Based Access** - Admin and user roles with proper permissions
+- **Data Persistence** - All data survives server restarts (file-based JSON storage)
+- **Document Management** - Multiple documents per user/team with easy deletion
+- **Activity Timestamps** - Accurate time tracking that persists across server restarts
 
 ---
 
@@ -191,28 +201,54 @@ onboard-flow/
 ├── src/                          # Frontend React application
 │   ├── components/               # Reusable UI components
 │   │   ├── onboarding/          # Onboarding-specific components
-│   │   └── ui/                  # shadcn/ui components
-│   ├── contexts/                # React contexts (Auth)
+│   │   │   ├── ArchivedFlows.tsx
+│   │   │   ├── OnboardingChatbot.tsx
+│   │   │   └── StepContent.tsx
+│   │   ├── ui/                  # shadcn/ui components
+│   │   ├── BrowserChrome.tsx    # Browser-like UI wrapper
+│   │   ├── NavLink.tsx          # Navigation component
+│   │   └── NotificationPopup.tsx # Team notifications
+│   ├── contexts/                # React contexts
+│   │   └── AuthContext.tsx      # Authentication context
 │   ├── hooks/                   # Custom React hooks
+│   │   └── use-toast.ts         # Toast notifications
 │   ├── lib/                     # Utilities and API client
+│   │   ├── api.ts               # API client functions
+│   │   ├── types.ts             # TypeScript type definitions
+│   │   └── utils.ts             # Utility functions
 │   ├── pages/                   # Page components
+│   │   ├── AccountPage.tsx      # User account management
+│   │   ├── AnalyticsPage.tsx    # Admin analytics dashboard
+│   │   ├── DashboardPage.tsx    # Main dashboard
+│   │   ├── LandingPage.tsx      # Public landing page
+│   │   ├── LoginPage.tsx        # Login page
+│   │   ├── OnboardingPage.tsx   # Onboarding workflow
+│   │   ├── RegisterPage.tsx     # Registration page
+│   │   ├── TeamsPage.tsx        # Team management
+│   │   └── UploadPage.tsx       # Document upload
 │   ├── test/                    # Test files and setup
 │   ├── App.tsx                  # Main app component
 │   └── main.tsx                 # Application entry point
 ├── server/                       # Backend Express API
 │   ├── src/
-│   │   ├── middleware/          # Auth middleware
+│   │   ├── middleware/          # Express middleware
+│   │   │   └── auth.ts          # JWT authentication
 │   │   ├── routes/              # API routes
-│   │   ├── services/            # Business logic (DB, Gemini)
+│   │   │   └── auth.ts          # Auth routes
+│   │   ├── services/            # Business logic
+│   │   │   ├── database.ts      # File-based database
+│   │   │   └── gemini.ts        # Google Gemini AI integration
 │   │   ├── types/               # TypeScript type definitions
 │   │   └── index.ts             # Server entry point
 │   ├── data/                    # JSON database storage
+│   │   └── database.json        # Persistent data file
 │   └── package.json             # Server dependencies
 ├── public/                       # Static assets
+│   ├── favicon.ico              # App favicon
+│   ├── favicon.svg              # SVG favicon
+│   └── placeholder.svg          # Placeholder image
 ├── start-dev.bat                # Windows startup script
 ├── DOCUMENTATION.md             # Technical documentation
-├── PROJECT_DESCRIPTION.md       # Complete feature list
-├── EXECUTIVE_SUMMARY.md         # Quick overview and ROI
 ├── CHANGELOG.md                 # Version history
 └── README.md                    # This file
 ```
@@ -222,15 +258,13 @@ onboard-flow/
 ## 📚 Documentation
 
 **Complete Documentation:**
-- 📋 **[PROJECT_DESCRIPTION.md](./PROJECT_DESCRIPTION.md)** - Comprehensive feature list and use cases
-- ⚡ **[EXECUTIVE_SUMMARY.md](./EXECUTIVE_SUMMARY.md)** - Quick overview and ROI analysis
 - 🔧 **[DOCUMENTATION.md](./DOCUMENTATION.md)** - Technical documentation and API reference
 - 📝 **[CHANGELOG.md](./CHANGELOG.md)** - Version history and updates
 
 **What to read:**
-- **New to the project?** Start with [EXECUTIVE_SUMMARY.md](./EXECUTIVE_SUMMARY.md)
-- **Want full details?** Read [PROJECT_DESCRIPTION.md](./PROJECT_DESCRIPTION.md)
+- **New to the project?** Start with this README
 - **Need technical info?** Check [DOCUMENTATION.md](./DOCUMENTATION.md)
+- **Want version history?** See [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
@@ -357,7 +391,7 @@ Proprietary - All rights reserved
 
 For questions, issues, or feature requests:
 - Check [DOCUMENTATION.md](./DOCUMENTATION.md) for technical details
-- Review [PROJECT_DESCRIPTION.md](./PROJECT_DESCRIPTION.md) for feature information
+- Review this README for feature information
 - Contact the development team
 
 ---
