@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { FileText, Shield, Users, Activity, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
-import { User } from "@/lib/types";
+import { User, Team } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -24,6 +24,7 @@ export default function AccountPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [userSteps, setUserSteps] = useState<any[]>([]);
+  const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
@@ -45,6 +46,10 @@ export default function AccountPage() {
           // Load user's steps to get accurate step count
           const steps = await api.getSteps(user.email);
           setUserSteps(steps);
+          
+          // Load user's teams
+          const teams = await api.getUserTeams(user.email);
+          setUserTeams(teams);
         }
       } catch (error) {
         console.error('Failed to load account data:', error);
@@ -351,6 +356,33 @@ export default function AccountPage() {
                       <div className="flex-1">
                         <p className="text-sm font-mono">{doc.name}</p>
                         <p className="text-[10px] font-mono text-muted-foreground">{doc.size} · {doc.status}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="animate-slide-up">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider flex items-center gap-2">
+                <Users className="w-3.5 h-3.5" /> My Teams
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {userTeams.length === 0 ? (
+                <p className="text-sm text-muted-foreground font-mono">Not a member of any teams yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {userTeams.map((team) => (
+                    <div key={team.id} className="flex items-center gap-3 p-2 rounded border border-border bg-background">
+                      <Users className="w-4 h-4 text-primary" />
+                      <div className="flex-1">
+                        <p className="text-sm font-mono">{team.name}</p>
+                        <p className="text-[10px] font-mono text-muted-foreground">
+                          {team.description || "No description"} · {team.members.length} member{team.members.length !== 1 ? "s" : ""}
+                        </p>
                       </div>
                     </div>
                   ))}

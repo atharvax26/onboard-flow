@@ -67,7 +67,24 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req: Au
     console.log('  - MIME type:', req.file.mimetype);
     console.log('  - Buffer length:', req.file.buffer.length);
 
-    const userId = req.user!.email;
+    const uploaderId = req.user!.email;
+    const teamId = req.body.teamId;
+    
+    if (!teamId) {
+      console.error('❌ No team ID provided');
+      return res.status(400).json({ error: 'Team ID is required' });
+    }
+    
+    console.log('👥 Team ID:', teamId);
+    
+    // Get team information
+    const team = db.getAllTeams().find(t => t.id === teamId);
+    if (!team) {
+      console.error('❌ Team not found:', teamId);
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    console.log('👥 Team found:', team.name, 'with', team.members.length, 'members');
     
     console.log('🤖 Starting Gemini parsing...');
     
@@ -77,7 +94,6 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req: Au
       console.log('✅ Parsing completed, extracted', steps.length, 'steps');
     } catch (parseError) {
       console.error('❌ Gemini parsing failed:', parseError);
-      // Return more specific error
       return res.status(500).json({ 
         error: 'Failed to parse document with AI',
         details: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
@@ -92,21 +108,55 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req: Au
       });
     }
     
-    const document = db.addDocument(userId, {
+    // Create document record for the uploader (admin)
+    const document = db.addDocument(uploaderId, {
       name: req.file.originalname,
       size: `${(req.file.size / 1024 / 1024).toFixed(2)} MB`,
+      teamId: teamId
     });
 
-    db.setUserSteps(userId, steps);
+    console.log('✅ Document saved to uploader\'s account:', uploaderId);
+    
+    // Distribute document to all team members
+    let distributedCount = 0;
+    for (const memberEmail of team.members) {
+      const member = db.getUser(memberEmail);
+      if (!member) {
+        console.warn(`⚠️ Team member not found: ${memberEmail}`);
+        continue;
+      }
+      
+      // Add document to member's uploaded documents list
+      const memberDoc = {
+        id: document.id,
+        name: document.name,
+        size: document.size,
+        uploadedAt: document.uploadedAt,
+        status: 'queued' as const,
+        teamId: teamId
+      };
+      
+      // Add to member's documents if not already there
+      if (!member.documentsUploaded.find(d => d.id === document.id)) {
+        member.documentsUploaded.push(memberDoc);
+      }
+      
+      // Add document to member's queue
+      db.addDocumentToQueue(memberEmail, document.id, document.name, teamId, JSON.parse(JSON.stringify(steps)));
+      
+      distributedCount++;
+      console.log(`✅ Document queued for team member: ${memberEmail}`);
+    }
 
-    console.log('✅ Document saved to database');
+    console.log(`✅ Document distributed to ${distributedCount} team member(s)`);
     console.log('✅ Upload process completed successfully');
 
     res.json({ 
       success: true, 
       document,
       steps,
-      message: `AI extracted ${steps.length} onboarding steps` 
+      distributedTo: distributedCount,
+      message: `AI extracted ${steps.length} onboarding steps and distributed to ${distributedCount} team member(s)` 
     });
   } catch (error) {
     console.error('❌ Upload error:', error);
@@ -246,6 +296,176 @@ app.get('/api/archived-flows/:userId', authenticateToken, (req: AuthRequest, res
   
   const archivedFlows = db.getArchivedFlows(userId);
   res.json(archivedFlows);
+});
+
+// Get document queue (requires authentication)
+app.get('/api/document-queue/:userId', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+  
+  // Users can only view their own queue, admins can view any
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const queue = db.getDocumentQueue(userId);
+  const user = db.getUser(userId);
+  
+  res.json({
+    queue,
+    activeDocumentId: user?.activeDocumentId,
+    queueLength: queue.length
+  });
+});
+
+// Manually activate next document (requires authentication)
+app.post('/api/activate-next-document/:userId', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+  
+  // Users can only activate their own documents, admins can activate any
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const activated = db.activateNextDocument(userId);
+  
+  if (!activated) {
+    return res.status(404).json({ error: 'No documents in queue' });
+  }
+  
+  res.json({ success: true, message: 'Next document activated' });
+});
+
+// Migrate existing documents to queue (admin only)
+app.post('/api/admin/migrate-queue', authenticateToken, async (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  try {
+    console.log('🔄 Starting document queue migration via API...');
+    
+    const users = db.getAllUsers();
+    const teams = db.getAllTeams();
+    
+    let migratedCount = 0;
+    const results: any[] = [];
+    
+    // For each team
+    for (const team of teams) {
+      const teamResult: any = {
+        teamName: team.name,
+        members: []
+      };
+      
+      // Get all documents uploaded for this team
+      const teamDocuments: any[] = [];
+      
+      for (const user of users) {
+        if (user.documentsUploaded && user.documentsUploaded.length > 0) {
+          const userTeamDocs = user.documentsUploaded.filter(doc => doc.teamId === team.id);
+          teamDocuments.push(...userTeamDocs.map(doc => ({
+            ...doc,
+            uploadedBy: user.email
+          })));
+        }
+      }
+      
+      if (teamDocuments.length === 0) continue;
+      
+      // Sort by upload date
+      const sortedDocs = [...teamDocuments].sort((a, b) => 
+        new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+      );
+      
+      // For each team member
+      for (const memberEmail of team.members) {
+        const member = db.getUser(memberEmail);
+        if (!member) continue;
+        
+        const memberResult: any = {
+          email: memberEmail,
+          name: member.name,
+          queued: []
+        };
+        
+        // Add documents to member's uploaded list
+        for (const doc of sortedDocs) {
+          const alreadyHas = member.documentsUploaded?.find(d => d.id === doc.id);
+          if (!alreadyHas) {
+            if (!member.documentsUploaded) {
+              member.documentsUploaded = [];
+            }
+            member.documentsUploaded.push({
+              id: doc.id,
+              name: doc.name,
+              size: doc.size,
+              uploadedAt: doc.uploadedAt,
+              status: 'queued' as const,
+              teamId: doc.teamId
+            });
+          }
+        }
+        
+        // Determine which documents to queue
+        let documentsToQueue = sortedDocs;
+        
+        if (member.onboardingStatus === 'completed') {
+          const archivedFlows = db.getArchivedFlows(memberEmail);
+          const completedDocIds = archivedFlows.map(f => f.documentId);
+          documentsToQueue = sortedDocs.filter(d => !completedDocIds.includes(d.id));
+        } else if (member.activeDocumentId) {
+          const activeDocIndex = sortedDocs.findIndex(d => d.id === member.activeDocumentId);
+          if (activeDocIndex !== -1) {
+            documentsToQueue = sortedDocs.slice(activeDocIndex + 1);
+          }
+        }
+        
+        // Queue the documents
+        for (const doc of documentsToQueue) {
+          const alreadyQueued = member.documentQueue?.find(q => q.documentId === doc.id);
+          if (alreadyQueued) continue;
+          
+          // Get steps from admin who uploaded
+          const uploaderSteps = db.getUserSteps(doc.uploadedBy);
+          if (!uploaderSteps || uploaderSteps.length === 0) continue;
+          
+          db.addDocumentToQueue(
+            memberEmail,
+            doc.id,
+            doc.name,
+            doc.teamId,
+            JSON.parse(JSON.stringify(uploaderSteps))
+          );
+          
+          memberResult.queued.push(doc.name);
+          migratedCount++;
+        }
+        
+        if (memberResult.queued.length > 0) {
+          teamResult.members.push(memberResult);
+        }
+      }
+      
+      if (teamResult.members.length > 0) {
+        results.push(teamResult);
+      }
+    }
+    
+    console.log(`✅ Migration complete! Queued ${migratedCount} document(s)`);
+    
+    res.json({
+      success: true,
+      message: `Successfully queued ${migratedCount} document(s)`,
+      migratedCount,
+      results
+    });
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+    res.status(500).json({
+      error: 'Migration failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // Archive a completed onboarding flow (requires authentication)
@@ -400,12 +620,18 @@ app.delete('/api/teams/:teamId/members/:email', authenticateToken, (req: AuthReq
   }
   
   const { teamId, email } = req.params;
+  const decodedEmail = decodeURIComponent(email);
+  
+  console.log(`🔄 Remove member request: teamId=${teamId}, email=${decodedEmail}`);
   
   try {
-    const team = db.removeTeamMember(teamId, decodeURIComponent(email));
+    const team = db.removeTeamMember(teamId, decodedEmail);
+    console.log(`✅ Member removed successfully`);
     res.json(team);
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to remove member' });
+    console.error('❌ Remove member error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to remove member';
+    res.status(400).json({ error: errorMessage });
   }
 });
 
@@ -423,6 +649,95 @@ app.delete('/api/teams/:teamId', authenticateToken, (req: AuthRequest, res) => {
   }
   
   res.json({ success: true, message: 'Team deleted successfully' });
+});
+
+// Get documents for user's teams
+app.get('/api/user/:userId/team-documents', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+  
+  // Users can only view their own team documents, admins can view any
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const user = db.getUser(userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  // Get all users
+  const allUsers = db.getAllUsers();
+  const teamDocuments: any[] = [];
+  
+  // Collect documents from all users that belong to this user's teams
+  allUsers.forEach(u => {
+    if (u.documentsUploaded && u.documentsUploaded.length > 0) {
+      u.documentsUploaded.forEach(doc => {
+        // Include document if it belongs to one of the user's teams
+        if (doc.teamId && user.teams?.includes(doc.teamId)) {
+          teamDocuments.push(doc);
+        }
+      });
+    }
+  });
+  
+  res.json(teamDocuments);
+});
+
+// Get user's teams
+app.get('/api/user/:userId/teams', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+  
+  // Users can only view their own teams, admins can view any
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const teams = db.getUserTeams(userId);
+  res.json(teams);
+});
+
+// Get user notifications
+app.get('/api/notifications/:userId', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+  
+  // Users can only view their own notifications
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const notifications = db.getNotifications(userId);
+  res.json(notifications);
+});
+
+// Mark notification as read
+app.post('/api/notifications/:userId/:notificationId/read', authenticateToken, (req: AuthRequest, res) => {
+  const { userId, notificationId } = req.params;
+  
+  // Users can only mark their own notifications
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const success = db.markNotificationRead(userId, notificationId);
+  if (!success) {
+    return res.status(404).json({ error: 'Notification not found' });
+  }
+  
+  res.json({ success: true });
+});
+
+// Clear all notifications
+app.delete('/api/notifications/:userId', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+  
+  // Users can only clear their own notifications
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  db.clearNotifications(userId);
+  res.json({ success: true, message: 'Notifications cleared' });
 });
 
 const PORT = process.env.PORT || 3001;

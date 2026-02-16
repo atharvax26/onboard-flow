@@ -67,82 +67,134 @@ export default function TeamsPage() {
   const [addingMember, setAddingMember] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) {
-      toast({
-        title: "Access Denied",
-        description: "Only admins can access the Teams page",
-        variant: "destructive"
-      });
+    loadTeams();
+  }, [isAdmin, user]);
+
+  const loadTeams = async () => {
+    if (!user) {
+      console.log('No user found, skipping team load');
       return;
     }
     
-    loadTeams();
-  }, [isAdmin, toast]);
-
-  const loadTeams = async () => {
+    console.log(`Loading teams for user: ${user.email}, isAdmin: ${isAdmin}`);
     setLoading(true);
+    
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/teams`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to load teams');
-      }
-
-      const data = await response.json();
-      setTeams(data);
+      let teamsData: Team[];
       
-      // Load user info for all team members
-      const allEmails = new Set<string>();
-      data.forEach((team: Team) => {
-        team.members.forEach((email: string) => allEmails.add(email));
-      });
-      
-      // Fetch user info for all unique emails
-      const userInfoPromises = Array.from(allEmails).map(async (email) => {
-        try {
-          const userResponse = await fetch(
-            `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${email}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-              }
+      if (isAdmin) {
+        // Admin: Load all teams
+        console.log('Fetching all teams (admin)...');
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/teams`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
             }
-          );
-          if (userResponse.ok) {
-            const userData = await userResponse.json();
-            return { email, info: { email: userData.email, name: userData.name, company: userData.company } };
           }
-        } catch (error) {
-          console.error(`Failed to load user info for ${email}:`, error);
+        );
+
+        console.log('Admin teams response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to load teams:', errorData);
+          throw new Error(errorData.error || 'Failed to load teams');
         }
-        return null;
-      });
+
+        teamsData = await response.json();
+        console.log('Admin teams loaded:', teamsData.length);
+      } else {
+        // Customer: Load only their teams
+        console.log(`Fetching teams for customer: ${user.email}...`);
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${user.email}/teams`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+          }
+        );
+
+        console.log('Customer teams response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to load user teams:', errorData);
+          throw new Error(errorData.error || 'Failed to load teams');
+        }
+
+        teamsData = await response.json();
+        console.log('Customer teams loaded:', teamsData.length);
+      }
       
-      const userInfoResults = await Promise.all(userInfoPromises);
-      const newUserInfoMap = new Map<string, UserInfo>();
-      userInfoResults.forEach(result => {
-        if (result) {
-          newUserInfoMap.set(result.email, result.info);
+      // Ensure teamsData is an array
+      if (!Array.isArray(teamsData)) {
+        console.error('Invalid teams data received:', teamsData);
+        teamsData = [];
+      }
+      
+      setTeams(teamsData);
+      console.log('Teams set in state:', teamsData.length);
+      
+      // Only load user info if there are teams with members
+      if (teamsData.length > 0) {
+        // Load user info for all team members
+        const allEmails = new Set<string>();
+        teamsData.forEach((team: Team) => {
+          team.members.forEach((email: string) => allEmails.add(email));
+        });
+        
+        console.log('Loading user info for', allEmails.size, 'members...');
+        
+        // Fetch user info for all unique emails
+        if (allEmails.size > 0) {
+          const userInfoPromises = Array.from(allEmails).map(async (email) => {
+            try {
+              const userResponse = await fetch(
+                `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${email}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                  }
+                }
+              );
+              if (userResponse.ok) {
+                const userData = await userResponse.json();
+                return { email, info: { email: userData.email, name: userData.name, company: userData.company } };
+              }
+            } catch (error) {
+              console.error(`Failed to load user info for ${email}:`, error);
+            }
+            return null;
+          });
+          
+          const userInfoResults = await Promise.all(userInfoPromises);
+          const newUserInfoMap = new Map<string, UserInfo>();
+          userInfoResults.forEach(result => {
+            if (result) {
+              newUserInfoMap.set(result.email, result.info);
+            }
+          });
+          setUserInfoMap(newUserInfoMap);
+          console.log('User info loaded for', newUserInfoMap.size, 'members');
         }
-      });
-      setUserInfoMap(newUserInfoMap);
+      } else {
+        console.log('No teams found, showing empty state');
+      }
       
     } catch (error) {
-      console.error('Failed to load teams:', error);
+      console.error('Error loading teams:', error);
       toast({
         title: "Load Failed",
-        description: "Failed to load teams. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to load teams. Please try again.",
         variant: "destructive"
       });
+      // Set empty array on error so UI shows empty state instead of loading forever
+      setTeams([]);
     } finally {
       setLoading(false);
+      console.log('Team loading complete');
     }
   };
 
@@ -287,6 +339,8 @@ export default function TeamsPage() {
 
   const handleRemoveMember = async (teamId: string, email: string) => {
     try {
+      console.log('Removing member:', { teamId, email });
+      
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/teams/${teamId}/members/${encodeURIComponent(email)}`,
         {
@@ -298,10 +352,14 @@ export default function TeamsPage() {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to remove member');
+        const errorData = await response.json();
+        console.error('Remove member failed:', errorData);
+        throw new Error(errorData.error || 'Failed to remove member');
       }
 
       const updatedTeam = await response.json();
+      console.log('Member removed successfully:', updatedTeam);
+      
       setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
       
       toast({
@@ -354,17 +412,7 @@ export default function TeamsPage() {
     }
   };
 
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-sm text-muted-foreground">Only admins can access the Teams page</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   if (loading) {
     return (
@@ -381,27 +429,38 @@ export default function TeamsPage() {
     <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6 min-h-[60vh]">
       <div className="flex items-center justify-between animate-slide-up">
         <div>
-          <h1 className="text-2xl font-semibold">Teams</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1">Manage teams and assign members</p>
+          <h1 className="text-2xl font-semibold">{isAdmin ? "Teams Management" : "My Teams"}</h1>
+          <p className="text-sm text-muted-foreground font-mono mt-1">
+            {isAdmin ? "Manage teams and assign members" : "View your team memberships"}
+          </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="font-mono">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Team
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setShowCreateDialog(true)} size="sm" className="font-mono text-xs">
+            <Plus className="w-3 h-3 mr-1.5" />
+            Create Team
+          </Button>
+        )}
       </div>
 
       {teams.length === 0 ? (
         <Card className="animate-slide-up">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Users className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-            <h3 className="text-lg font-semibold mb-2">No Teams Yet</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              {isAdmin ? "No Teams Yet" : "Not in Any Teams"}
+            </h3>
             <p className="text-sm text-muted-foreground text-center mb-4">
-              Create your first team to organize users and manage onboarding
+              {isAdmin 
+                ? "Create your first team to organize users and manage onboarding"
+                : "You haven't been added to any teams yet. Contact your admin to join a team."
+              }
             </p>
-            <Button onClick={() => setShowCreateDialog(true)} className="font-mono">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Team
-            </Button>
+            {isAdmin && (
+              <Button onClick={() => setShowCreateDialog(true)} size="sm" className="font-mono text-xs">
+                <Plus className="w-3 h-3 mr-1.5" />
+                Create Team
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -416,14 +475,16 @@ export default function TeamsPage() {
                       <p className="text-sm text-muted-foreground mt-1">{team.description}</p>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setDeletingTeam(team)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeletingTeam(team)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -432,18 +493,20 @@ export default function TeamsPage() {
                     <span className="text-xs font-mono uppercase text-muted-foreground tracking-wider">
                       Members ({team.members.length})
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs font-mono"
-                      onClick={() => {
-                        setSelectedTeam(team);
-                        setShowAddMemberDialog(true);
-                      }}
-                    >
-                      <UserPlus className="w-3 h-3 mr-1" />
-                      Add Member
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs font-mono"
+                        onClick={() => {
+                          setSelectedTeam(team);
+                          setShowAddMemberDialog(true);
+                        }}
+                      >
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        Add Member
+                      </Button>
+                    )}
                   </div>
 
                   {team.members.length === 0 ? (
@@ -455,32 +518,49 @@ export default function TeamsPage() {
                     <div className="space-y-2">
                       {team.members.map((email) => {
                         const userInfo = userInfoMap.get(email);
+                        const isCurrentUser = user.email === email;
                         return (
                           <div
                             key={email}
-                            className="group flex items-center justify-between p-2 rounded border border-border bg-background hover:border-primary/30 transition-colors"
+                            className={`group flex items-center justify-between p-2 rounded border bg-background hover:border-primary/30 transition-colors ${
+                              isCurrentUser ? "border-primary/50 bg-primary/5" : "border-border"
+                            }`}
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                               <div className="flex-1 min-w-0">
                                 {userInfo ? (
                                   <>
-                                    <p className="text-sm font-mono truncate">{userInfo.name}</p>
-                                    <p className="text-xs text-muted-foreground font-mono truncate">{email} · {userInfo.company}</p>
+                                    <p className="text-sm font-mono truncate">
+                                      {userInfo.name}
+                                      {isCurrentUser && (
+                                        <span className="ml-2 text-xs text-primary">(You)</span>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground font-mono truncate">
+                                      {email} · {userInfo.company}
+                                    </p>
                                   </>
                                 ) : (
-                                  <span className="text-sm font-mono truncate">{email}</span>
+                                  <span className="text-sm font-mono truncate">
+                                    {email}
+                                    {isCurrentUser && (
+                                      <span className="ml-2 text-xs text-primary">(You)</span>
+                                    )}
+                                  </span>
                                 )}
                               </div>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                              onClick={() => handleRemoveMember(team.id, email)}
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                onClick={() => handleRemoveMember(team.id, email)}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                           </div>
                         );
                       })}
@@ -493,135 +573,141 @@ export default function TeamsPage() {
         </div>
       )}
 
-      {/* Create Team Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Team</DialogTitle>
-            <DialogDescription>
-              Create a team to organize users and manage their onboarding
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="team-name">Team Name</Label>
-              <Input
-                id="team-name"
-                placeholder="e.g., Engineering Team"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                className="font-mono"
-              />
+      {/* Create Team Dialog - Admin Only */}
+      {isAdmin && (
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Team</DialogTitle>
+              <DialogDescription>
+                Create a team to organize users and manage their onboarding
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="team-name">Team Name</Label>
+                <Input
+                  id="team-name"
+                  placeholder="e.g., Engineering Team"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="team-description">Description (Optional)</Label>
+                <Input
+                  id="team-description"
+                  placeholder="Brief description of the team"
+                  value={teamDescription}
+                  onChange={(e) => setTeamDescription(e.target.value)}
+                  className="font-mono"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="team-description">Description (Optional)</Label>
-              <Input
-                id="team-description"
-                placeholder="Brief description of the team"
-                value={teamDescription}
-                onChange={(e) => setTeamDescription(e.target.value)}
-                className="font-mono"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCreateDialog(false);
-                setTeamName("");
-                setTeamDescription("");
-              }}
-              disabled={creating}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleCreateTeam} disabled={creating}>
-              {creating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Team"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateDialog(false);
+                  setTeamName("");
+                  setTeamDescription("");
+                }}
+                disabled={creating}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleCreateTeam} disabled={creating}>
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Team"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* Add Member Dialog */}
-      <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
-            <DialogDescription>
-              Add a user to {selectedTeam?.name} by their email address
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="member-email">Email Address</Label>
-              <Input
-                id="member-email"
-                type="email"
-                placeholder="username@gmail.com"
-                value={memberEmail}
-                onChange={(e) => setMemberEmail(e.target.value)}
-                className="font-mono"
-              />
-              <p className="text-xs text-muted-foreground">
-                Only registered users with Gmail addresses can be added
-              </p>
+      {/* Add Member Dialog - Admin Only */}
+      {isAdmin && (
+        <Dialog open={showAddMemberDialog} onOpenChange={setShowAddMemberDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Team Member</DialogTitle>
+              <DialogDescription>
+                Add a user to {selectedTeam?.name} by their email address
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="member-email">Email Address</Label>
+                <Input
+                  id="member-email"
+                  type="email"
+                  placeholder="username@gmail.com"
+                  value={memberEmail}
+                  onChange={(e) => setMemberEmail(e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Only registered users with Gmail addresses can be added
+                </p>
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowAddMemberDialog(false);
-                setMemberEmail("");
-                setSelectedTeam(null);
-              }}
-              disabled={addingMember}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAddMember} disabled={addingMember}>
-              {addingMember ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                "Add Member"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddMemberDialog(false);
+                  setMemberEmail("");
+                  setSelectedTeam(null);
+                }}
+                disabled={addingMember}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddMember} disabled={addingMember}>
+                {addingMember ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Member"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* Delete Team Confirmation */}
-      <AlertDialog open={!!deletingTeam} onOpenChange={(open) => !open && setDeletingTeam(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Team?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <span className="font-mono font-semibold">{deletingTeam?.name}</span>? 
-              This will remove the team and all its members. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteTeam}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete Team
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Team Confirmation - Admin Only */}
+      {isAdmin && (
+        <AlertDialog open={!!deletingTeam} onOpenChange={(open) => !open && setDeletingTeam(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Team?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete <span className="font-mono font-semibold">{deletingTeam?.name}</span>? 
+                This will remove the team and all its members. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteTeam}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete Team
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

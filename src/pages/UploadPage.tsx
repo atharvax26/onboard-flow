@@ -1,11 +1,18 @@
-import { useState, useCallback, useEffect } from "react";
+﻿import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, CheckCircle, Loader2, Eye, Trash2, Calendar, HardDrive } from "lucide-react";
+import { Upload, FileText, CheckCircle, Loader2, Eye, Trash2, Calendar, HardDrive, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +39,14 @@ interface DocumentRecord {
   size: string;
   uploadedAt: string;
   status: "processing" | "parsed" | "error";
+  teamId?: string;
+  teamName?: string;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export default function UploadPage() {
@@ -44,11 +59,98 @@ export default function UploadPage() {
   const [deletingDoc, setDeletingDoc] = useState<DocumentRecord | null>(null);
   const [viewingDoc, setViewingDoc] = useState<DocumentRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [loadingTeams, setLoadingTeams] = useState(true);
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
 
-  // Load user's documents on mount
+  // Load teams on mount (for admin only)
+  useEffect(() => {
+    async function loadTeams() {
+      if (!user) {
+        setLoadingTeams(false);
+        return;
+      }
+
+      // Only load teams for admin users
+      if (user.role !== 'admin') {
+        console.log('👤 Regular user - will use user\'s teams automatically');
+        setLoadingTeams(false);
+        return;
+      }
+
+      // Don't reload if we already have teams
+      if (teams.length > 0) {
+        console.log('👥 Teams already loaded, skipping reload');
+        setLoadingTeams(false);
+        return;
+      }
+
+      try {
+        console.log('👥 Loading all teams for admin:', user.email);
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+        const url = `${apiUrl}/teams`;
+        console.log('👥 Fetching from:', url);
+        
+        const authToken = localStorage.getItem('authToken');
+        console.log('👥 Auth token exists:', !!authToken);
+        
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('👥 Response status:', response.status);
+        console.log('👥 Response ok:', response.ok);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('👥 Error response:', errorText);
+          
+          // If it's a 403, the user might not have admin access
+          if (response.status === 403) {
+            throw new Error('Admin access required to view teams');
+          }
+          
+          throw new Error(`Failed to fetch teams: ${response.status} ${response.statusText}`);
+        }
+
+        const teamsData = await response.json();
+        console.log('👥 Teams loaded successfully:', teamsData);
+        console.log('👥 Number of teams:', teamsData.length);
+        
+        if (!Array.isArray(teamsData)) {
+          console.error('👥 Teams data is not an array:', teamsData);
+          throw new Error('Invalid teams data format');
+        }
+        
+        setTeams(teamsData);
+        
+        // Auto-select first team if only one available
+        if (teamsData.length === 1 && !selectedTeam) {
+          setSelectedTeam(teamsData[0].id);
+          console.log('👥 Auto-selected team:', teamsData[0].name);
+        }
+      } catch (error) {
+        console.error('❌ Failed to load teams:', error);
+        toast({
+          title: "Failed to load teams",
+          description: error instanceof Error ? error.message : "Unknown error",
+          variant: "destructive"
+        });
+      } finally {
+        setLoadingTeams(false);
+      }
+    }
+
+    loadTeams();
+  }, [user, toast]); // Removed teams and selectedTeam from dependencies to prevent re-loading
+
+  // Load documents after teams are loaded
   useEffect(() => {
     async function loadDocuments() {
       if (!user) {
@@ -56,23 +158,85 @@ export default function UploadPage() {
         return;
       }
 
+      // Wait for teams to load first (for admin)
+      if (user.role === 'admin' && loadingTeams) {
+        return;
+      }
+
       try {
-        console.log('📄 Loading documents for user:', user.email);
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${user.email}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch user data');
-        }
-
-        const userData = await response.json();
-        console.log('📦 User data received:', userData);
-        console.log('📚 Documents uploaded:', userData.documentsUploaded);
+        console.log('📄 Loading documents for user:', user.email, 'Role:', user.role);
         
-        setDocuments(userData.documentsUploaded || []);
+        let allDocuments: DocumentRecord[] = [];
+        
+        if (user.role === 'admin') {
+          // Admin: Fetch all users and collect all documents
+          console.log('👑 Admin user - fetching all documents from all users');
+          const usersResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/users`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+          });
+
+          if (usersResponse.ok) {
+            const allUsers = await usersResponse.json();
+            console.log('👥 All users fetched:', allUsers.length);
+            
+            // Collect documents from all users
+            allUsers.forEach((u: any) => {
+              if (u.documentsUploaded && u.documentsUploaded.length > 0) {
+                allDocuments.push(...u.documentsUploaded);
+              }
+            });
+            
+            console.log('📚 Total documents from all users:', allDocuments.length);
+          }
+        } else {
+          // Regular user: Fetch documents for their teams
+          console.log('👤 Regular user - fetching team documents');
+          
+          if (!user.teams || user.teams.length === 0) {
+            console.log('⚠️ User has no teams assigned');
+            setDocuments([]);
+            setLoading(false);
+            return;
+          }
+          
+          const teamDocsResponse = await fetch(
+            `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/user/${user.email}/team-documents`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+              }
+            }
+          );
+
+          if (teamDocsResponse.ok) {
+            allDocuments = await teamDocsResponse.json();
+            console.log('📚 Team documents fetched:', allDocuments.length);
+          } else {
+            console.error('❌ Failed to fetch team documents:', teamDocsResponse.status);
+            throw new Error('Failed to fetch team documents');
+          }
+        }
+        
+        console.log('📚 Documents to display:', allDocuments.length);
+        
+        // Enrich documents with team names
+        const enrichedDocs = allDocuments.map((doc: DocumentRecord) => {
+          if (doc.teamId) {
+            const team = teams.find(t => t.id === doc.teamId);
+            return {
+              ...doc,
+              teamName: team?.name
+            };
+          }
+          return doc;
+        });
+        
+        // Sort by upload date (newest first)
+        enrichedDocs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+        
+        setDocuments(enrichedDocs);
       } catch (error) {
         console.error('❌ Failed to load documents:', error);
         toast({
@@ -86,9 +250,29 @@ export default function UploadPage() {
     }
 
     loadDocuments();
-  }, [user, toast]);
+  }, [user, toast, teams, loadingTeams]);
 
   const handleFile = useCallback((f: File) => {
+    // For admin, require team selection
+    if (user?.role === 'admin' && !selectedTeam) {
+      toast({
+        title: "No team selected",
+        description: "Please select a team before uploading a document",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // For regular users, check if they have a team
+    if (user?.role !== 'admin' && (!user?.teams || user.teams.length === 0)) {
+      toast({
+        title: "No team assigned",
+        description: "You need to be added to a team before uploading documents",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!f.name.endsWith(".pdf")) {
       toast({
         title: "Invalid file type",
@@ -100,7 +284,7 @@ export default function UploadPage() {
     setFile(f);
     setFileInfo({ name: f.name, size: `${(f.size / 1024 / 1024).toFixed(2)} MB` });
     setState("selected");
-  }, [toast]);
+  }, [toast, selectedTeam, user]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -109,7 +293,34 @@ export default function UploadPage() {
   }, [handleFile]);
 
   const processFile = async () => {
-    if (!file || !user) return;
+    if (!file || !user) {
+      return;
+    }
+
+    // For admin, require team selection
+    if (user.role === 'admin' && !selectedTeam) {
+      toast({
+        title: "Missing information",
+        description: "Please select a team before uploading",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // For regular users, use their first team or require team selection if they have multiple
+    let teamIdToUse = selectedTeam;
+    if (user.role !== 'admin') {
+      if (!user.teams || user.teams.length === 0) {
+        toast({
+          title: "No team assigned",
+          description: "You need to be added to a team before uploading documents",
+          variant: "destructive"
+        });
+        return;
+      }
+      // Use the first team for regular users
+      teamIdToUse = user.teams[0];
+    }
 
     setState("processing");
     setProgress(0);
@@ -124,6 +335,7 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('userId', user.email);
+      formData.append('teamId', teamIdToUse);
 
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/upload`, {
         method: 'POST',
@@ -145,12 +357,20 @@ export default function UploadPage() {
       setExtractedSteps(data.steps?.length || 0);
       setState("done");
 
-      // Add document to list
-      setDocuments(prev => [data.document, ...prev]);
+      // Add document to list with team info
+      const teamName = user.role === 'admin' 
+        ? teams.find(t => t.id === teamIdToUse)?.name 
+        : 'Your Team';
+      
+      setDocuments(prev => [{
+        ...data.document,
+        teamId: teamIdToUse,
+        teamName: teamName
+      }, ...prev]);
 
       toast({
         title: "Document processed successfully",
-        description: `AI extracted ${data.steps?.length || 0} onboarding steps`,
+        description: `AI extracted ${data.steps?.length || 0} onboarding steps${teamName ? ` for ${teamName}` : ''}`,
       });
     } catch (error) {
       console.error('Upload error:', error);
@@ -235,6 +455,85 @@ export default function UploadPage() {
         <p className="text-sm text-muted-foreground font-mono mt-1">Upload your onboarding PDF for AI parsing</p>
       </div>
 
+      {/* Team Selection Section - Admin Only */}
+      {user?.role === 'admin' && (
+        <Card className="animate-slide-up">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider flex items-center gap-2">
+              <Users className="w-3.5 h-3.5" /> Select Team (Admin)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingTeams ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="font-mono">Loading teams...</span>
+              </div>
+            ) : teams.length === 0 ? (
+              <div className="space-y-3">
+                <div className="p-4 rounded-lg border border-yellow-200 bg-yellow-50">
+                  <p className="text-sm text-yellow-800 font-mono mb-2">
+                    ⚠️ No teams available
+                  </p>
+                  <p className="text-xs text-yellow-700 font-mono">
+                    Create teams first before uploading documents. Make sure the server is running on port 3001.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate('/teams')}
+                    className="font-mono text-xs"
+                  >
+                    Go to Teams Page →
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.reload()}
+                    className="font-mono text-xs"
+                  >
+                    Retry Loading
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <SelectTrigger className="font-mono">
+                    <SelectValue placeholder="Choose which team to upload document for..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id} className="font-mono">
+                        <div className="flex flex-col items-start py-1">
+                          <span className="font-medium">{team.name}</span>
+                          {team.description && (
+                            <span className="text-xs text-muted-foreground mt-0.5">{team.description}</span>
+                          )}
+                          <span className="text-xs text-muted-foreground mt-0.5">
+                            {team.members.length} member{team.members.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedTeam && (
+                  <div className="flex items-center gap-2 p-2 rounded bg-primary/5 border border-primary/20">
+                    <CheckCircle className="w-4 h-4 text-primary" />
+                    <p className="text-xs text-primary font-mono">
+                      Documents will be uploaded to {teams.find(t => t.id === selectedTeam)?.name}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid md:grid-cols-2 gap-6">
         {/* Left Column - Upload Section */}
         <div className="space-y-6">
@@ -243,13 +542,35 @@ export default function UploadPage() {
             <div
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
-              className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary/50 transition-colors cursor-pointer animate-slide-up"
-              onClick={() => document.getElementById("file-input")?.click()}
+              className={`border-2 border-dashed border-border rounded-lg p-12 text-center transition-colors ${
+                (user?.role === 'admin' && selectedTeam) || (user?.role !== 'admin' && user?.teams && user.teams.length > 0)
+                  ? 'hover:border-primary/50 cursor-pointer' 
+                  : 'opacity-50 cursor-not-allowed'
+              } animate-slide-up`}
+              onClick={() => {
+                const canUpload = (user?.role === 'admin' && selectedTeam) || (user?.role !== 'admin' && user?.teams && user.teams.length > 0);
+                if (canUpload) {
+                  document.getElementById("file-input")?.click();
+                }
+              }}
             >
               <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-              <p className="text-sm font-medium">Drop your PDF here or click to browse</p>
+              <p className="text-sm font-medium">
+                {user?.role === 'admin' && !selectedTeam
+                  ? 'Select a team first to enable upload'
+                  : user?.role !== 'admin' && (!user?.teams || user.teams.length === 0)
+                  ? 'You need to be added to a team to upload documents'
+                  : 'Drop your PDF here or click to browse'}
+              </p>
               <p className="text-xs text-muted-foreground font-mono mt-1">PDF files only · Max 20MB</p>
-              <input id="file-input" type="file" accept=".pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+              <input 
+                id="file-input" 
+                type="file" 
+                accept=".pdf" 
+                className="hidden" 
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                disabled={user?.role === 'admin' ? !selectedTeam : (!user?.teams || user.teams.length === 0)}
+              />
             </div>
           )}
 
@@ -295,7 +616,7 @@ export default function UploadPage() {
             {state === "selected" && (
               <Button onClick={processFile} className="font-mono text-sm">Parse with AI →</Button>
             )}
-            {state === "done" && (
+            {state === "done" && user?.role !== 'admin' && (
               <Button onClick={() => navigate("/onboarding")} className="font-mono text-sm">View Onboarding Steps →</Button>
             )}
             {state !== "idle" && state !== "processing" && (
@@ -309,7 +630,7 @@ export default function UploadPage() {
           <Card className="animate-slide-up">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-mono uppercase text-muted-foreground tracking-wider flex items-center gap-2">
-                <FileText className="w-3.5 h-3.5" /> Uploaded Documents
+                <FileText className="w-3.5 h-3.5" /> {user?.role === 'admin' ? 'All Documents (All Teams)' : 'Uploaded Documents'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -321,11 +642,18 @@ export default function UploadPage() {
               ) : documents.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <p className="text-sm text-muted-foreground font-mono">No documents uploaded yet</p>
+                  <p className="text-sm text-muted-foreground font-mono">
+                    {user?.role === 'admin' ? 'No documents uploaded yet across all teams' : 'No documents uploaded yet'}
+                  </p>
                   <p className="text-xs text-muted-foreground font-mono mt-1">Upload a PDF to get started</p>
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {user?.role === 'admin' && (
+                    <div className="text-xs text-muted-foreground font-mono mb-2">
+                      Showing {documents.length} document{documents.length !== 1 ? 's' : ''} from all teams
+                    </div>
+                  )}
                   {documents.map((doc) => (
                     <div
                       key={doc.id}
@@ -337,6 +665,12 @@ export default function UploadPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium font-mono truncate">{doc.name}</p>
+                          {doc.teamName && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Users className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground font-mono">{doc.teamName}</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-xs text-muted-foreground font-mono flex items-center gap-1">
                               <HardDrive className="w-3 h-3" />
@@ -452,6 +786,17 @@ export default function UploadPage() {
                 </div>
               </div>
 
+              {/* Team Information */}
+              {viewingDoc.teamName && (
+                <div className="p-3 rounded-lg border border-border bg-muted/30">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Users className="w-4 h-4" />
+                    <span className="text-xs font-mono uppercase tracking-wider">Team</span>
+                  </div>
+                  <p className="font-mono font-semibold">{viewingDoc.teamName}</p>
+                </div>
+              )}
+
               {/* Document ID */}
               <div className="p-3 rounded-lg border border-border bg-muted/30">
                 <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
@@ -462,19 +807,21 @@ export default function UploadPage() {
 
               {/* Actions */}
               <div className="flex gap-2 pt-2">
-                <Button 
-                  onClick={() => {
-                    setViewingDoc(null);
-                    navigate("/onboarding");
-                  }}
-                  className="flex-1 font-mono"
-                >
-                  View Onboarding Steps →
-                </Button>
+                {user?.role !== 'admin' && (
+                  <Button 
+                    onClick={() => {
+                      setViewingDoc(null);
+                      navigate("/onboarding");
+                    }}
+                    className="flex-1 font-mono"
+                  >
+                    View Onboarding Steps →
+                  </Button>
+                )}
                 <Button 
                   variant="outline"
                   onClick={() => setViewingDoc(null)}
-                  className="font-mono"
+                  className={`font-mono ${user?.role === 'admin' ? 'flex-1' : ''}`}
                 >
                   Close
                 </Button>

@@ -7,6 +7,7 @@ export interface Activity {
   action: string;
   detail: string;
   time: string;
+  timestamp: string; // ISO timestamp for accurate time calculation
 }
 
 export interface AuthResponse {
@@ -21,15 +22,21 @@ let authToken: string | null = localStorage.getItem('authToken');
 export function setAuthToken(token: string) {
   authToken = token;
   localStorage.setItem('authToken', token);
+  console.log('✅ Token set in memory and localStorage');
 }
 
 export function getAuthToken(): string | null {
+  // Always read from localStorage to ensure we have the latest value
+  if (!authToken) {
+    authToken = localStorage.getItem('authToken');
+  }
   return authToken;
 }
 
 export function clearAuthToken() {
   authToken = null;
   localStorage.removeItem('authToken');
+  console.log('✅ Token cleared from memory and localStorage');
 }
 
 function getHeaders(): HeadersInit {
@@ -234,6 +241,92 @@ export const api = {
     });
     if (!response.ok) {
       throw new Error('Failed to get chat response');
+    }
+    return response.json();
+  },
+
+  async getUserTeams(userId: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/user/${userId}/teams`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch user teams');
+    }
+    return response.json();
+  },
+
+  async getUserTeamDocuments(userId: string): Promise<DocumentRecord[]> {
+    const response = await fetch(`${API_BASE}/user/${userId}/team-documents`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch team documents');
+    }
+    return response.json();
+  },
+
+  async getNotifications(userId: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/notifications/${userId}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch notifications');
+    }
+    return response.json();
+  },
+
+  async markNotificationRead(userId: string, notificationId: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/notifications/${userId}/${notificationId}/read`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to mark notification as read');
+    }
+  },
+
+  async clearNotifications(userId: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/notifications/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to clear notifications');
+    }
+  },
+
+  async migrateQueue(): Promise<{ success: boolean; message: string; migratedCount: number; results: any[] }> {
+    const response = await fetch(`${API_BASE}/admin/migrate-queue`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to migrate queue');
+    }
+    return response.json();
+  },
+
+  async getDocumentQueue(userId: string): Promise<{
+    queue: any[];
+    activeDocumentId?: string;
+    queueLength: number;
+  }> {
+    const response = await fetch(`${API_BASE}/document-queue/${userId}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch document queue');
+    }
+    return response.json();
+  },
+
+  async activateNextDocument(userId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE}/activate-next-document/${userId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to activate next document');
     }
     return response.json();
   },

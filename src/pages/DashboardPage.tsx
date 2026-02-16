@@ -147,7 +147,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Button onClick={() => navigate("/analytics")} className="font-mono text-sm">
+        <Button onClick={() => navigate("/analytics")} size="sm" className="font-mono text-xs">
           View Full Analytics →
         </Button>
       </div>
@@ -230,7 +230,7 @@ export default function DashboardPage() {
       </Card>
 
       {user.onboardingStatus !== "not_started" && (
-        <Button onClick={() => navigate("/onboarding")} className="font-mono text-sm">
+        <Button onClick={() => navigate("/onboarding")} size="sm" className="font-mono text-xs">
           Continue Onboarding →
         </Button>
       )}

@@ -9,6 +9,19 @@ export interface User {
   currentStep: number;
   lastActivity: string;
   documentsUploaded: DocumentRecord[];
+  teams?: string[]; // Array of team IDs the user belongs to
+  notifications?: Notification[];
+}
+
+export interface Notification {
+  id: string;
+  type: "team_added" | "team_removed" | "info";
+  title: string;
+  message: string;
+  teamId?: string;
+  teamName?: string;
+  read: boolean;
+  createdAt: string;
 }
 
 export interface DocumentRecord {
@@ -27,4 +40,13 @@ export interface OnboardingStep {
   status: "pending" | "in_progress" | "completed";
   timeSpent: string;
   dependencies: string[];
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description: string;
+  members: string[];
+  createdAt: string;
+  createdBy: string;
 }

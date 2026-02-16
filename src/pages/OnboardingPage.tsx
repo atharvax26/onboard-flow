@@ -46,6 +46,9 @@ export default function OnboardingPage() {
   const [deletingFlow, setDeletingFlow] = useState<any | null>(null);
   const [showCompletionAnimation, setShowCompletionAnimation] = useState(false);
   const [completedFlowData, setCompletedFlowData] = useState<any | null>(null);
+  const [documentQueue, setDocumentQueue] = useState<any[]>([]);
+  const [activeDocumentId, setActiveDocumentId] = useState<string | undefined>();
+  const [activeDocumentName, setActiveDocumentName] = useState<string>('');
 
   // Fetch real steps from backend
   useEffect(() => {
@@ -60,16 +63,26 @@ export default function OnboardingPage() {
       setLoading(true); // Ensure loading state is set
 
       try {
-        const [fetchedSteps, archived] = await Promise.all([
+        const [fetchedSteps, archived, queueData] = await Promise.all([
           api.getSteps(user.email),
-          api.getArchivedFlows(user.email)
+          api.getArchivedFlows(user.email),
+          api.getDocumentQueue(user.email)
         ]);
         
         console.log('📦 Received steps from API:', fetchedSteps);
         console.log('📊 Number of steps:', fetchedSteps?.length);
         console.log('📚 Archived flows:', archived?.length);
+        console.log('📋 Document queue:', queueData);
         
         setArchivedFlows(archived || []);
+        setDocumentQueue(queueData.queue || []);
+        setActiveDocumentId(queueData.activeDocumentId);
+        
+        // Get active document name
+        if (queueData.activeDocumentId && user.documentsUploaded) {
+          const activeDoc = user.documentsUploaded.find(d => d.id === queueData.activeDocumentId);
+          setActiveDocumentName(activeDoc?.name || '');
+        }
         
         if (fetchedSteps && fetchedSteps.length > 0) {
           console.log('✅ Using REAL Gemini-generated steps');
@@ -363,16 +376,50 @@ export default function OnboardingPage() {
           <div className="text-center max-w-md">
             <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
             <h2 className="text-xl font-semibold mb-2">No Onboarding Steps Yet</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Upload your company document to generate personalized AI-powered onboarding steps.
-            </p>
-            <Button 
-              onClick={() => navigate("/upload")}
-              className="inline-flex items-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Document
-            </Button>
+            
+            {documentQueue.length > 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">
+                  You have {documentQueue.length} document{documentQueue.length !== 1 ? 's' : ''} waiting in your queue.
+                </p>
+                <Button 
+                  onClick={async () => {
+                    if (!user) return;
+                    try {
+                      await api.activateNextDocument(user.email);
+                      toast({
+                        title: "Document activated",
+                        description: "Loading onboarding steps...",
+                      });
+                      // Reload the page to show new steps
+                      window.location.reload();
+                    } catch (error) {
+                      toast({
+                        title: "Activation failed",
+                        description: "Failed to activate next document",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  className="font-mono text-sm"
+                >
+                  Start Next Document →
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload your company document to generate personalized AI-powered onboarding steps.
+                </p>
+                <Button 
+                  onClick={() => navigate("/upload")}
+                  className="inline-flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload Document
+                </Button>
+              </>
+            )}
           </div>
         </div>
         
@@ -447,21 +494,6 @@ export default function OnboardingPage() {
     )}
 
     <div className="flex flex-col md:flex-row min-h-[60vh]">
-      {/* Data Source Indicator */}
-      <div className="absolute top-2 right-2 z-10">
-        {dataSource === 'real' ? (
-          <div className="bg-primary/10 border border-primary/30 rounded px-3 py-1 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-mono text-primary">AI-Generated Steps</span>
-          </div>
-        ) : (
-          <div className="bg-yellow-100 border border-yellow-300 rounded px-3 py-1 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-yellow-600" />
-            <span className="text-xs font-mono text-yellow-700">Demo Mode - Upload your document for AI steps</span>
-          </div>
-        )}
-      </div>
-
       {/* Left sidebar - AI Workflow Explorer */}
       <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border p-4 bg-chrome/50">
         {/* AI Engine Banner */}
@@ -474,6 +506,81 @@ export default function OnboardingPage() {
             Steps dynamically generated from company profile &amp; document analysis
           </p>
         </div>
+
+        {/* Document Queue Section */}
+        {(activeDocumentName || documentQueue.length > 0) && (
+          <div className="mb-4 p-2.5 rounded-md border border-primary/20 bg-primary/5">
+            <div className="flex items-center gap-1.5 mb-2">
+              <FileText className="w-3 h-3 text-primary" />
+              <span className="text-[10px] font-mono uppercase text-primary tracking-wider">Document Queue</span>
+            </div>
+            
+            {activeDocumentName ? (
+              <div className="mb-2">
+                <p className="text-[10px] font-mono text-muted-foreground mb-1">Active:</p>
+                <p className="text-xs font-mono text-primary font-medium truncate" title={activeDocumentName}>
+                  {activeDocumentName}
+                </p>
+              </div>
+            ) : (
+              <div className="mb-2">
+                <p className="text-[10px] font-mono text-muted-foreground mb-1.5">No active document</p>
+                {documentQueue.length > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!user) return;
+                      try {
+                        await api.activateNextDocument(user.email);
+                        toast({
+                          title: "Document activated",
+                          description: "Loading onboarding steps...",
+                        });
+                        window.location.reload();
+                      } catch (error) {
+                        toast({
+                          title: "Activation failed",
+                          description: "Failed to activate next document",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                    className="w-full h-7 text-[10px] font-mono gap-1.5"
+                  >
+                    <Play className="w-3 h-3" />
+                    Start Next Document
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {documentQueue.length > 0 && (
+              <div>
+                <p className="text-[10px] font-mono text-muted-foreground mb-1.5">
+                  Queued ({documentQueue.length}):
+                </p>
+                <div className="space-y-1">
+                  {documentQueue.slice(0, 3).map((doc, idx) => (
+                    <div
+                      key={doc.documentId}
+                      className="flex items-center gap-1.5 p-1.5 rounded bg-background/50 border border-border/50"
+                    >
+                      <span className="text-[10px] font-mono text-muted-foreground">{idx + 1}.</span>
+                      <span className="text-[10px] font-mono text-foreground truncate flex-1" title={doc.documentName}>
+                        {doc.documentName}
+                      </span>
+                    </div>
+                  ))}
+                  {documentQueue.length > 3 && (
+                    <p className="text-[10px] font-mono text-muted-foreground text-center py-1">
+                      +{documentQueue.length - 3} more
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Maturity Assessment */}
         <div className="mb-4 p-2.5 rounded-md border border-border bg-card">
@@ -522,7 +629,75 @@ export default function OnboardingPage() {
           })}
         </div>
 
-        {/* Archived Flows in Sidebar */}
+        {/* Archived Flows removed from left sidebar - moved to right */}
+      </div>
+
+      {/* Center - AI-Enhanced Step Details */}
+      <div className="flex-1 p-6 md:p-8">
+        {percent === 100 && (
+          <div className="animate-slide-up max-w-4xl mx-auto space-y-6">
+            {/* Completion Header */}
+            <div className="text-center py-8">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-10 h-10 text-primary" />
+              </div>
+              <h2 className="text-2xl font-semibold mb-2">Onboarding Complete!</h2>
+              <p className="text-sm text-muted-foreground mb-6">
+                AI-driven workflow finished. All {steps.length} adaptive steps completed based on your company profile.
+              </p>
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 inline-block">
+                <p className="text-sm font-mono text-primary">{completedCount}/{steps.length} steps • 100% • Enterprise Ready</p>
+              </div>
+              <p className="text-sm text-muted-foreground mt-4">
+                View your completion report in the Onboarding History section below.
+              </p>
+            </div>
+          </div>
+        )}
+        {percent < 100 && active && (
+          <StepContent step={active} onComplete={completeStep} />
+        )}
+      </div>
+
+      {/* Right sidebar - AI Property Inspector */}
+      <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-border p-4 bg-chrome/50">
+        <p className="text-xs font-mono uppercase text-muted-foreground tracking-wider mb-3">Properties</p>
+        {active && (
+          <div className="space-y-3">
+            {[
+              { label: "Status", value: active.status.replace("_", " ") },
+              { label: "Time Spent", value: active.timeSpent },
+              { label: "Step ID", value: `#${active.id}` },
+            ].map((prop) => (
+              <div key={prop.label} className="grid grid-cols-[80px_1fr] gap-2 items-center">
+                <span className="text-[10px] font-mono text-muted-foreground uppercase">{prop.label}</span>
+                <span className="text-xs font-mono bg-card rounded px-2 py-1 border border-border capitalize">{prop.value}</span>
+              </div>
+            ))}
+
+            <div>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1 mb-1">
+                <GitBranch className="w-3 h-3" /> Dependencies
+              </span>
+              {active.dependencies.length > 0 ? (
+                active.dependencies.map((d, i) => (
+                  <span key={i} className="inline-block text-[10px] font-mono bg-card rounded px-2 py-0.5 border border-border mr-1 mb-1">{d}</span>
+                ))
+              ) : (
+                <span className="text-[10px] font-mono text-muted-foreground">None</span>
+              )}
+            </div>
+
+            <div>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1 mb-1">
+                <Clock className="w-3 h-3" /> Time Spent
+              </span>
+              <span className="text-xs font-mono">{active.timeSpent}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Onboarding History in Right Sidebar */}
         {user && archivedFlows.length > 0 && (
           <div className="mt-6 pt-4 border-t border-border">
             <p className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
@@ -598,72 +773,6 @@ export default function OnboardingPage() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Center - AI-Enhanced Step Details */}
-      <div className="flex-1 p-6 md:p-8">
-        {percent === 100 && (
-          <div className="animate-slide-up max-w-4xl mx-auto space-y-6">
-            {/* Completion Header */}
-            <div className="text-center py-8">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-10 h-10 text-primary" />
-              </div>
-              <h2 className="text-2xl font-semibold mb-2">Onboarding Complete!</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                AI-driven workflow finished. All {steps.length} adaptive steps completed based on your company profile.
-              </p>
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 inline-block">
-                <p className="text-sm font-mono text-primary">{completedCount}/{steps.length} steps • 100% • Enterprise Ready</p>
-              </div>
-              <p className="text-sm text-muted-foreground mt-4">
-                View your completion report in the Onboarding History section below.
-              </p>
-            </div>
-          </div>
-        )}
-        {percent < 100 && active && (
-          <StepContent step={active} onComplete={completeStep} />
-        )}
-      </div>
-
-      {/* Right sidebar - AI Property Inspector */}
-      <div className="w-full md:w-64 border-t md:border-t-0 md:border-l border-border p-4 bg-chrome/50">
-        <p className="text-xs font-mono uppercase text-muted-foreground tracking-wider mb-3">Properties</p>
-        {active && (
-          <div className="space-y-3">
-            {[
-              { label: "Status", value: active.status.replace("_", " ") },
-              { label: "Time Spent", value: active.timeSpent },
-              { label: "Step ID", value: `#${active.id}` },
-            ].map((prop) => (
-              <div key={prop.label} className="grid grid-cols-[80px_1fr] gap-2 items-center">
-                <span className="text-[10px] font-mono text-muted-foreground uppercase">{prop.label}</span>
-                <span className="text-xs font-mono bg-card rounded px-2 py-1 border border-border capitalize">{prop.value}</span>
-              </div>
-            ))}
-
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1 mb-1">
-                <GitBranch className="w-3 h-3" /> Dependencies
-              </span>
-              {active.dependencies.length > 0 ? (
-                active.dependencies.map((d, i) => (
-                  <span key={i} className="inline-block text-[10px] font-mono bg-card rounded px-2 py-0.5 border border-border mr-1 mb-1">{d}</span>
-                ))
-              ) : (
-                <span className="text-[10px] font-mono text-muted-foreground">None</span>
-              )}
-            </div>
-
-            <div>
-              <span className="text-[10px] font-mono text-muted-foreground uppercase flex items-center gap-1 mb-1">
-                <Clock className="w-3 h-3" /> Time Spent
-              </span>
-              <span className="text-xs font-mono">{active.timeSpent}</span>
             </div>
           </div>
         )}

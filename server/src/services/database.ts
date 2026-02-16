@@ -19,6 +19,21 @@ interface User {
   currentStep: number;
   lastActivity: string;
   documentsUploaded: DocumentRecord[];
+  teams?: string[]; // Array of team IDs
+  notifications?: Notification[];
+  documentQueue?: QueuedDocument[]; // Queue of documents to process
+  activeDocumentId?: string; // Currently active document being processed
+}
+
+interface Notification {
+  id: string;
+  type: 'team_added' | 'team_removed' | 'info';
+  title: string;
+  message: string;
+  teamId?: string;
+  teamName?: string;
+  read: boolean;
+  createdAt: string;
 }
 
 interface DocumentRecord {
@@ -26,7 +41,16 @@ interface DocumentRecord {
   name: string;
   size: string;
   uploadedAt: string;
-  status: 'processing' | 'parsed' | 'error';
+  status: 'processing' | 'parsed' | 'error' | 'queued' | 'active';
+  teamId?: string;
+}
+
+interface QueuedDocument {
+  documentId: string;
+  documentName: string;
+  teamId: string;
+  queuedAt: string;
+  steps: OnboardingStep[];
 }
 
 interface Activity {
@@ -34,6 +58,7 @@ interface Activity {
   action: string;
   detail: string;
   time: string;
+  timestamp: string; // ISO timestamp for accurate time calculation
 }
 
 interface ArchivedFlow {
@@ -120,7 +145,7 @@ class Database {
     return user;
   }
 
-  addDocument(userId: string, doc: { name: string; size: string }): DocumentRecord {
+  addDocument(userId: string, doc: { name: string; size: string; teamId?: string }): DocumentRecord {
     const user = this.users.get(userId);
     if (!user) throw new Error('User not found');
 
@@ -129,14 +154,16 @@ class Database {
       name: doc.name,
       size: doc.size,
       uploadedAt: new Date().toISOString(),
-      status: 'parsed'
+      status: 'parsed',
+      teamId: doc.teamId
     };
 
     user.documentsUploaded.push(document);
     user.lastActivity = new Date().toISOString();
     
-    this.addActivity(userId, 'Document uploaded', doc.name);
-    this.addAdminActivity(user.name, `Uploaded document: ${doc.name}`);
+    const teamInfo = doc.teamId ? ` for team ${this.teams.find(t => t.id === doc.teamId)?.name || doc.teamId}` : '';
+    this.addActivity(userId, 'Document uploaded', `${doc.name}${teamInfo}`);
+    this.addAdminActivity(user.name, `Uploaded document: ${doc.name}${teamInfo}`);
     
     this.persistChanges();
     return document;
@@ -370,6 +397,8 @@ class Database {
 
     if (user.completionPercent === 100) {
       user.onboardingStatus = 'completed';
+      // Complete current document and activate next one
+      this.completeCurrentDocument(userId);
     } else if (user.completionPercent > 0) {
       user.onboardingStatus = 'in_progress';
     }
@@ -383,31 +412,44 @@ class Database {
 
   addActivity(userId: string, action: string, detail: string): void {
     const activities = this.activities.get(userId) || [];
+    const now = new Date().toISOString();
     activities.unshift({
       id: `act-${Date.now()}`,
       action,
       detail,
-      time: this.getRelativeTime(new Date())
+      time: this.getRelativeTime(new Date(now)),
+      timestamp: now
     });
     this.activities.set(userId, activities.slice(0, 10));
   }
 
   addAdminActivity(userName: string, detail: string): void {
+    const now = new Date().toISOString();
     this.adminActivities.unshift({
       id: `admin-act-${Date.now()}`,
       action: userName,
       detail,
-      time: this.getRelativeTime(new Date())
+      time: this.getRelativeTime(new Date(now)),
+      timestamp: now
     });
     this.adminActivities = this.adminActivities.slice(0, 10);
   }
 
   getUserActivity(userId: string): Activity[] {
-    return this.activities.get(userId) || [];
+    const activities = this.activities.get(userId) || [];
+    // Recalculate relative time for each activity
+    return activities.map(activity => ({
+      ...activity,
+      time: this.getRelativeTime(new Date(activity.timestamp))
+    }));
   }
 
   getAdminActivity(): Activity[] {
-    return this.adminActivities;
+    // Recalculate relative time for each activity
+    return this.adminActivities.map(activity => ({
+      ...activity,
+      time: this.getRelativeTime(new Date(activity.timestamp))
+    }));
   }
 
   private getRelativeTime(date: Date): string {
@@ -444,10 +486,12 @@ class Database {
   addTeamMember(teamId: string, email: string): Team {
     const team = this.teams.find(t => t.id === teamId);
     if (!team) {
+      console.error(`❌ Team not found: ${teamId}`);
       throw new Error('Team not found');
     }
     
     if (team.members.includes(email)) {
+      console.error(`❌ User ${email} is already a member of team ${team.name}`);
       throw new Error('User is already a member of this team');
     }
     
@@ -455,30 +499,89 @@ class Database {
     const user = this.getUser(email);
     const userName = user ? user.name : email;
     
+    console.log(`🔄 Adding ${userName} (${email}) to team ${team.name}...`);
     team.members.push(email);
+    
+    // Add user's team reference
+    if (user) {
+      if (!user.teams) user.teams = [];
+      user.teams.push(teamId);
+      console.log(`   ✅ Added team reference to user`);
+      
+      // Create notification for the user
+      try {
+        this.addNotification(email, {
+          type: 'team_added',
+          title: 'Added to Team',
+          message: `You have been added to the team "${team.name}"`,
+          teamId: team.id,
+          teamName: team.name
+        });
+        console.log(`   ✅ Notification created for user`);
+      } catch (notifError) {
+        console.error(`   ⚠️ Failed to create notification:`, notifError);
+        // Don't fail the whole operation if notification fails
+      }
+    } else {
+      console.log(`   ⚠️ User ${email} not found in database`);
+    }
+    
     this.addAdminActivity('Admin', `Added ${userName} (${email}) to team: ${team.name}`);
     this.persistChanges();
     
-    console.log(`✅ Added member ${userName} (${email}) to team: ${team.name}`);
+    console.log(`✅ Successfully added member ${userName} (${email}) to team: ${team.name}`);
     return team;
   }
 
   removeTeamMember(teamId: string, email: string): Team {
     const team = this.teams.find(t => t.id === teamId);
     if (!team) {
+      console.error(`❌ Team not found: ${teamId}`);
       throw new Error('Team not found');
     }
     
     const index = team.members.indexOf(email);
     if (index === -1) {
+      console.error(`❌ User ${email} is not a member of team ${team.name}`);
       throw new Error('User is not a member of this team');
     }
     
+    console.log(`🔄 Removing ${email} from team ${team.name}...`);
     team.members.splice(index, 1);
+    
+    // Remove user's team reference
+    const user = this.getUser(email);
+    if (user) {
+      if (user.teams) {
+        const teamIndex = user.teams.indexOf(teamId);
+        if (teamIndex !== -1) {
+          user.teams.splice(teamIndex, 1);
+          console.log(`   ✅ Removed team reference from user`);
+        }
+      }
+      
+      // Create notification for the user
+      try {
+        this.addNotification(email, {
+          type: 'team_removed',
+          title: 'Removed from Team',
+          message: `You have been removed from the team "${team.name}"`,
+          teamId: team.id,
+          teamName: team.name
+        });
+        console.log(`   ✅ Notification created for user`);
+      } catch (notifError) {
+        console.error(`   ⚠️ Failed to create notification:`, notifError);
+        // Don't fail the whole operation if notification fails
+      }
+    } else {
+      console.log(`   ⚠️ User ${email} not found in database (might have been deleted)`);
+    }
+    
     this.addAdminActivity('Admin', `Removed ${email} from team: ${team.name}`);
     this.persistChanges();
     
-    console.log(`✅ Removed member ${email} from team: ${team.name}`);
+    console.log(`✅ Successfully removed member ${email} from team: ${team.name}`);
     return team;
   }
 
@@ -489,12 +592,268 @@ class Database {
     }
     
     const team = this.teams[index];
+    
+    // Remove team reference from all members
+    team.members.forEach(email => {
+      const user = this.getUser(email);
+      if (user && user.teams) {
+        const teamIndex = user.teams.indexOf(teamId);
+        if (teamIndex !== -1) {
+          user.teams.splice(teamIndex, 1);
+        }
+      }
+    });
+    
     this.teams.splice(index, 1);
     this.addAdminActivity('Admin', `Deleted team: ${team.name}`);
     this.persistChanges();
     
     console.log(`✅ Team deleted: ${team.name}`);
     return true;
+  }
+
+  // Notification methods
+  addNotification(userId: string, notification: Omit<Notification, 'id' | 'read' | 'createdAt'>): void {
+    const user = this.getUser(userId);
+    if (!user) return;
+
+    if (!user.notifications) {
+      user.notifications = [];
+    }
+
+    const newNotification: Notification = {
+      id: `notif-${Date.now()}`,
+      ...notification,
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    user.notifications.unshift(newNotification);
+    // Keep only last 50 notifications
+    user.notifications = user.notifications.slice(0, 50);
+    
+    this.persistChanges();
+    console.log(`📬 Notification added for user ${userId}: ${notification.title}`);
+  }
+
+  getNotifications(userId: string): Notification[] {
+    const user = this.getUser(userId);
+    return user?.notifications || [];
+  }
+
+  markNotificationRead(userId: string, notificationId: string): boolean {
+    const user = this.getUser(userId);
+    if (!user || !user.notifications) return false;
+
+    const notification = user.notifications.find(n => n.id === notificationId);
+    if (!notification) return false;
+
+    notification.read = true;
+    this.persistChanges();
+    return true;
+  }
+
+  clearNotifications(userId: string): void {
+    const user = this.getUser(userId);
+    if (!user) return;
+
+    user.notifications = [];
+    this.persistChanges();
+  }
+
+  getUserTeams(userId: string): Team[] {
+    const user = this.getUser(userId);
+    if (!user || !user.teams) return [];
+
+    return this.teams.filter(team => user.teams?.includes(team.id));
+  }
+
+  // Document Queue Management
+  addDocumentToQueue(userId: string, documentId: string, documentName: string, teamId: string, steps: OnboardingStep[]): void {
+    const user = this.getUser(userId);
+    if (!user) {
+      console.error(`❌ User not found: ${userId}`);
+      return;
+    }
+
+    if (!user.documentQueue) {
+      user.documentQueue = [];
+    }
+
+    const queuedDoc: QueuedDocument = {
+      documentId,
+      documentName,
+      teamId,
+      queuedAt: new Date().toISOString(),
+      steps
+    };
+
+    user.documentQueue.push(queuedDoc);
+    console.log(`📥 Document "${documentName}" added to queue for user ${userId}. Queue length: ${user.documentQueue.length}`);
+    
+    // If this is the first document and user has no active onboarding, activate it immediately
+    if (!user.activeDocumentId && user.onboardingStatus === 'not_started') {
+      this.activateNextDocument(userId);
+    }
+    
+    this.persistChanges();
+  }
+
+  activateNextDocument(userId: string): boolean {
+    const user = this.getUser(userId);
+    if (!user) {
+      console.error(`❌ User not found: ${userId}`);
+      return false;
+    }
+
+    if (!user.documentQueue || user.documentQueue.length === 0) {
+      console.log(`📭 No documents in queue for user ${userId}`);
+      user.activeDocumentId = undefined;
+      user.onboardingStatus = 'not_started';
+      this.persistChanges();
+      return false;
+    }
+
+    // Get the next document from queue
+    const nextDoc = user.documentQueue.shift()!;
+    
+    // Archive current flow if it exists and has progress
+    const existingSteps = this.steps.get(userId);
+    if (existingSteps && existingSteps.length > 0 && user.activeDocumentId) {
+      const completedSteps = existingSteps.filter(s => s.status === 'completed').length;
+      if (completedSteps > 0) {
+        const oldDocument = user.documentsUploaded.find(d => d.id === user.activeDocumentId);
+        const completionPercent = Math.round((completedSteps / existingSteps.length) * 100);
+        
+        const archivedFlow: ArchivedFlow = {
+          id: `flow-${Date.now()}`,
+          documentName: oldDocument?.name || 'Unknown Document',
+          documentId: oldDocument?.id || '',
+          steps: existingSteps,
+          completedAt: new Date().toISOString(),
+          completionPercent
+        };
+        
+        const userArchive = this.archivedFlows.get(userId) || [];
+        userArchive.unshift(archivedFlow);
+        this.archivedFlows.set(userId, userArchive);
+        
+        console.log(`📦 Archived previous flow "${oldDocument?.name}"`);
+      }
+    }
+
+    // Set the new document as active
+    user.activeDocumentId = nextDoc.documentId;
+    
+    // Set first step to in_progress
+    if (nextDoc.steps.length > 0) {
+      nextDoc.steps[0].status = 'in_progress';
+    }
+    
+    // Set the steps for this document
+    this.steps.set(userId, nextDoc.steps);
+    
+    // Update user status
+    user.onboardingStatus = 'in_progress';
+    user.completionPercent = 0;
+    user.currentStep = 1;
+    user.lastActivity = new Date().toISOString();
+    
+    // Update document status
+    const doc = user.documentsUploaded.find(d => d.id === nextDoc.documentId);
+    if (doc) {
+      doc.status = 'active';
+    }
+    
+    console.log(`✅ Activated document "${nextDoc.documentName}" for user ${userId}. Remaining in queue: ${user.documentQueue.length}`);
+    
+    // Add notification
+    this.addNotification(userId, {
+      type: 'info',
+      title: 'New Onboarding Started',
+      message: `Started onboarding for "${nextDoc.documentName}"`
+    });
+    
+    this.addActivity(userId, 'Onboarding started', nextDoc.documentName);
+    
+    this.persistChanges();
+    return true;
+  }
+
+  completeCurrentDocument(userId: string): void {
+    const user = this.getUser(userId);
+    if (!user || !user.activeDocumentId) {
+      console.log(`⚠️ No active document for user ${userId}`);
+      return;
+    }
+
+    const currentSteps = this.steps.get(userId);
+    if (!currentSteps) {
+      console.log(`⚠️ No steps found for user ${userId}`);
+      return;
+    }
+
+    // Archive the completed flow
+    const completedSteps = currentSteps.filter(s => s.status === 'completed').length;
+    const completionPercent = Math.round((completedSteps / currentSteps.length) * 100);
+    
+    const currentDocument = user.documentsUploaded.find(d => d.id === user.activeDocumentId);
+    
+    if (completionPercent === 100) {
+      const archivedFlow: ArchivedFlow = {
+        id: `flow-${Date.now()}`,
+        documentName: currentDocument?.name || 'Unknown Document',
+        documentId: user.activeDocumentId,
+        steps: currentSteps,
+        completedAt: new Date().toISOString(),
+        completionPercent
+      };
+      
+      const userArchive = this.archivedFlows.get(userId) || [];
+      userArchive.unshift(archivedFlow);
+      this.archivedFlows.set(userId, userArchive);
+      
+      console.log(`📦 Archived completed flow "${currentDocument?.name}"`);
+      
+      // Update document status to parsed (completed)
+      if (currentDocument) {
+        currentDocument.status = 'parsed';
+      }
+      
+      // Mark as completed
+      user.onboardingStatus = 'completed';
+      user.completionPercent = 100;
+      
+      this.addActivity(userId, 'Onboarding completed', currentDocument?.name || 'Document');
+      
+      // Check if there are more documents in queue
+      if (user.documentQueue && user.documentQueue.length > 0) {
+        console.log(`📋 ${user.documentQueue.length} document(s) remaining in queue`);
+        
+        // Add notification about next document
+        const nextDoc = user.documentQueue[0];
+        this.addNotification(userId, {
+          type: 'info',
+          title: 'Next Document Ready',
+          message: `"${nextDoc.documentName}" is ready for onboarding. It will start automatically.`
+        });
+        
+        // Automatically activate the next document
+        setTimeout(() => {
+          this.activateNextDocument(userId);
+        }, 1000); // Small delay to allow UI to show completion
+      } else {
+        console.log(`✅ All documents completed for user ${userId}`);
+        user.activeDocumentId = undefined;
+      }
+      
+      this.persistChanges();
+    }
+  }
+
+  getDocumentQueue(userId: string): QueuedDocument[] {
+    const user = this.getUser(userId);
+    return user?.documentQueue || [];
   }
 
   // Persistence methods
@@ -508,8 +867,40 @@ class Database {
         this.users = new Map(parsed.users);
         this.steps = new Map(parsed.steps);
         this.archivedFlows = new Map(parsed.archivedFlows);
-        this.activities = new Map(parsed.activities);
-        this.adminActivities = parsed.adminActivities || [];
+        
+        // Migrate activities to include timestamp if missing
+        // For old activities without timestamp, try to parse from the activity ID or use a fallback
+        const migratedActivities = new Map<string, Activity[]>();
+        for (const [userId, activities] of parsed.activities) {
+          migratedActivities.set(userId, activities.map(activity => {
+            if (activity.timestamp) {
+              return activity;
+            }
+            // Try to extract timestamp from ID (format: act-{timestamp})
+            const idMatch = activity.id.match(/act-(\d+)/);
+            const timestamp = idMatch ? new Date(parseInt(idMatch[1])).toISOString() : new Date().toISOString();
+            return {
+              ...activity,
+              timestamp
+            };
+          }));
+        }
+        this.activities = migratedActivities;
+        
+        // Migrate admin activities to include timestamp if missing
+        this.adminActivities = (parsed.adminActivities || []).map(activity => {
+          if (activity.timestamp) {
+            return activity;
+          }
+          // Try to extract timestamp from ID (format: admin-act-{timestamp})
+          const idMatch = activity.id.match(/admin-act-(\d+)/);
+          const timestamp = idMatch ? new Date(parseInt(idMatch[1])).toISOString() : new Date().toISOString();
+          return {
+            ...activity,
+            timestamp
+          };
+        });
+        
         this.teams = parsed.teams || [];
         
         console.log('✅ Database loaded from file');
@@ -558,3 +949,4 @@ class Database {
 }
 
 export const db = new Database();
+export type { QueuedDocument };
