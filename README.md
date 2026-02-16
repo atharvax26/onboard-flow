@@ -42,7 +42,7 @@ Traditional onboarding processes face critical limitations:
 **Onboard Flow delivers intelligent automation:**
 
 1. 📤 **Upload** company documents (handbooks, policies, procedures)
-2. 🤖 **AI Analysis** via Google Gemini 2.5 Flash
+2. 🤖 **AI Analysis** 
 3. ⚡ **Auto-Generation** of structured, sequential onboarding steps
 4. 📋 **Guided Experience** with detailed, actionable instructions
 5. 💬 **24/7 AI Assistant** providing instant, context-aware support
