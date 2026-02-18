@@ -21,6 +21,12 @@ export default function DashboardPage() {
       if (!user) return;
 
       try {
+        // Check if this is a first-time visit
+        const isFirstVisit = !localStorage.getItem('hasVisitedDashboard');
+        if (isFirstVisit) {
+          localStorage.setItem('hasVisitedDashboard', 'true');
+        }
+
         // Refresh user data first
         await refreshUser();
         

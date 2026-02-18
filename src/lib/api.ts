@@ -330,4 +330,77 @@ export const api = {
     }
     return response.json();
   },
+
+  // Support Query API Methods
+  async createSupportQuery(
+    subject: string,
+    category: string,
+    priority: string,
+    description: string
+  ): Promise<{ success: boolean; query: any }> {
+    const response = await fetch(`${API_BASE}/support/query`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ subject, category, priority, description }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create support query');
+    }
+    return response.json();
+  },
+
+  async getAllSupportQueries(): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/support/queries`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch support queries');
+    }
+    return response.json();
+  },
+
+  async getUserSupportQueries(userId: string): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/support/queries/${userId}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch user support queries');
+    }
+    return response.json();
+  },
+
+  async updateQueryStatus(queryId: string, status: string): Promise<{ success: boolean; query: any }> {
+    const response = await fetch(`${API_BASE}/support/query/${queryId}/status`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to update query status');
+    }
+    return response.json();
+  },
+
+  async addQueryResponse(queryId: string, message: string): Promise<{ success: boolean; query: any }> {
+    const response = await fetch(`${API_BASE}/support/query/${queryId}/response`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ message }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to add query response');
+    }
+    return response.json();
+  },
+
+  async deleteSupportQuery(queryId: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE}/support/query/${queryId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete support query');
+    }
+    return response.json();
+  },
 };

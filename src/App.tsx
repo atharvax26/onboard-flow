@@ -14,6 +14,7 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import AccountPage from "@/pages/AccountPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import TeamsPage from "@/pages/TeamsPage";
+import SupportPage from "@/pages/SupportPage";
 import MigrationPage from "@/pages/MigrationPage";
 import NotFound from "@/pages/NotFound";
 
@@ -71,6 +72,7 @@ function AppRoutes() {
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
         <Route path="/analytics" element={<AdminRoute><AnalyticsPage /></AdminRoute>} />
         <Route path="/teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><SupportPage /></ProtectedRoute>} />
         <Route path="/migrate" element={<AdminRoute><MigrationPage /></AdminRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

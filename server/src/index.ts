@@ -740,6 +740,162 @@ app.delete('/api/notifications/:userId', authenticateToken, (req: AuthRequest, r
   res.json({ success: true, message: 'Notifications cleared' });
 });
 
+// ============================================
+// Support Query Endpoints
+// ============================================
+
+// Create a new support query (users only)
+app.post('/api/support/query', authenticateToken, (req: AuthRequest, res) => {
+  const { subject, category, priority, description } = req.body;
+  const user = req.user!;
+
+  if (!subject || !category || !priority || !description) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const query = db.createSupportQuery(
+      user.email,
+      user.name,
+      user.email,
+      subject,
+      category,
+      priority,
+      description
+    );
+
+    res.json({ success: true, query });
+  } catch (error) {
+    console.error('Error creating support query:', error);
+    res.status(500).json({ error: 'Failed to create support query' });
+  }
+});
+
+// Get all support queries (admin only)
+app.get('/api/support/queries', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const queries = db.getAllSupportQueries();
+  res.json(queries);
+});
+
+// Get user's support queries
+app.get('/api/support/queries/:userId', authenticateToken, (req: AuthRequest, res) => {
+  const { userId } = req.params;
+
+  // Users can only view their own queries, admins can view all
+  if (req.user!.email !== userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const queries = db.getUserSupportQueries(userId);
+  res.json(queries);
+});
+
+// Get a specific support query
+app.get('/api/support/query/:queryId', authenticateToken, (req: AuthRequest, res) => {
+  const { queryId } = req.params;
+  const query = db.getSupportQuery(queryId);
+
+  if (!query) {
+    return res.status(404).json({ error: 'Query not found' });
+  }
+
+  // Users can only view their own queries, admins can view all
+  if (req.user!.email !== query.userId && req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  res.json(query);
+});
+
+// Update query status (admin only)
+app.put('/api/support/query/:queryId/status', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { queryId } = req.params;
+  const { status } = req.body;
+
+  if (!status || !['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  const query = db.updateQueryStatus(queryId, status);
+  if (!query) {
+    return res.status(404).json({ error: 'Query not found' });
+  }
+
+  // Add notification to the user about status change
+  const statusMessages: Record<string, string> = {
+    'open': 'Your support query has been reopened',
+    'in_progress': 'Your support query is now being reviewed',
+    'resolved': 'Your support query has been resolved',
+    'closed': 'Your support query has been closed'
+  };
+
+  db.addNotification(query.userId, {
+    type: 'info',
+    title: 'Support Query Status Updated',
+    message: `${statusMessages[status]}: "${query.subject}"`,
+  });
+
+  res.json({ success: true, query });
+});
+
+// Add a response to a query (admin only)
+app.post('/api/support/query/:queryId/response', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { queryId } = req.params;
+  const { message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  const query = db.addQueryResponse(
+    queryId,
+    req.user!.email,
+    req.user!.name,
+    message
+  );
+
+  if (!query) {
+    return res.status(404).json({ error: 'Query not found' });
+  }
+
+  // Add notification to the user about the response
+  db.addNotification(query.userId, {
+    type: 'info',
+    title: 'Support Response Received',
+    message: `${req.user!.name} responded to your query: "${query.subject}"`,
+  });
+
+  res.json({ success: true, query });
+});
+
+// Delete a support query (admin only)
+app.delete('/api/support/query/:queryId', authenticateToken, (req: AuthRequest, res) => {
+  if (req.user!.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { queryId } = req.params;
+  const success = db.deleteSupportQuery(queryId);
+
+  if (!success) {
+    return res.status(404).json({ error: 'Query not found' });
+  }
+
+  res.json({ success: true, message: 'Query deleted successfully' });
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

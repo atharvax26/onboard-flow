@@ -4,20 +4,24 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, ArrowRight, RotateCw, Lock, LogOut } from "lucide-react";
 import NotificationPopup from "./NotificationPopup";
 
+// Customer/User Navigation - Optimized for workflow
 const USER_TABS = [
   { label: "Home", path: "/dashboard" },
-  { label: "Document Upload", path: "/upload" },
   { label: "Onboarding", path: "/onboarding" },
+  { label: "Upload", path: "/upload" },
   { label: "Teams", path: "/teams" },
-  { label: "Account Details", path: "/account" },
+  { label: "Support", path: "/support" },
+  { label: "Account", path: "/account" },
 ];
 
+// Admin Navigation - Optimized for management and oversight
 const ADMIN_TABS = [
   { label: "Home", path: "/dashboard" },
-  { label: "Document Upload", path: "/upload" },
-  { label: "Account Details", path: "/account" },
-  { label: "Teams", path: "/teams" },
   { label: "Analytics", path: "/analytics" },
+  { label: "Teams", path: "/teams" },
+  { label: "Upload", path: "/upload" },
+  { label: "Support", path: "/support" },
+  { label: "Account", path: "/account" },
 ];
 
 export default function BrowserChrome({ children }: { children: ReactNode }) {

@@ -91,6 +91,51 @@ router.post('/login', async (req, res) => {
     db.addActivity(user.email, 'Logged in', 'User session started');
     db.addAdminActivity(user.name, 'Logged in');
 
+    // Add support notifications for non-admin users
+    if (user.role !== 'admin') {
+      // Check for support query responses
+      const userQueries = db.getUserSupportQueries(user.email);
+      const queriesWithNewResponses = userQueries.filter(q => 
+        q.responses.length > 0 && 
+        q.status !== 'closed' &&
+        // Check if there are responses newer than last login
+        q.responses.some(r => new Date(r.createdAt) > new Date(user.lastActivity || 0))
+      );
+
+      // Notify about support query responses
+      queriesWithNewResponses.forEach(query => {
+        const latestResponse = query.responses[query.responses.length - 1];
+        db.addNotification(user.email, {
+          type: 'info',
+          title: 'Support Response Received',
+          message: `Your support query "${query.subject}" has a new response from ${latestResponse.responderName}`,
+        });
+      });
+
+      // Add welcome notification for first-time login (if no previous activity)
+      const userActivities = db.getUserActivity(user.email);
+      const loginCount = userActivities.filter(a => a.action === 'Logged in').length;
+      
+      if (loginCount === 1) {
+        // First login - add welcome notification
+        db.addNotification(user.email, {
+          type: 'info',
+          title: 'Welcome to OnboardFlow!',
+          message: 'Need help? Visit the Support page to submit queries or check our FAQ section.',
+        });
+      }
+
+      // Check for open support queries and remind user
+      const openQueries = userQueries.filter(q => q.status === 'open' || q.status === 'in_progress');
+      if (openQueries.length > 0 && loginCount > 1) {
+        db.addNotification(user.email, {
+          type: 'info',
+          title: 'Support Queries Update',
+          message: `You have ${openQueries.length} active support ${openQueries.length === 1 ? 'query' : 'queries'}. Check the Support page for updates.`,
+        });
+      }
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { email: user.email, role: user.role },

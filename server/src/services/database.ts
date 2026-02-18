@@ -79,6 +79,31 @@ interface Team {
   createdBy: string;
 }
 
+interface SupportQuery {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  subject: string;
+  category: 'technical' | 'billing' | 'feature' | 'bug' | 'other';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  description: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt?: string;
+  responses: QueryResponse[];
+}
+
+interface QueryResponse {
+  id: string;
+  queryId: string;
+  responderId: string;
+  responderName: string;
+  message: string;
+  createdAt: string;
+}
+
 interface DatabaseData {
   users: [string, User][];
   steps: [string, OnboardingStep[]][];
@@ -86,6 +111,7 @@ interface DatabaseData {
   activities: [string, Activity[]][];
   adminActivities: Activity[];
   teams: Team[];
+  supportQueries: SupportQuery[];
 }
 
 class Database {
@@ -95,6 +121,7 @@ class Database {
   private activities: Map<string, Activity[]> = new Map();
   private adminActivities: Activity[] = [];
   private teams: Team[] = [];
+  private supportQueries: SupportQuery[] = [];
 
   constructor() {
     // Load data from file if it exists
@@ -902,12 +929,14 @@ class Database {
         });
         
         this.teams = parsed.teams || [];
+        this.supportQueries = parsed.supportQueries || [];
         
         console.log('✅ Database loaded from file');
         console.log(`   Users: ${this.users.size}`);
         console.log(`   Steps: ${this.steps.size}`);
         console.log(`   Archived flows: ${this.archivedFlows.size}`);
         console.log(`   Teams: ${this.teams.length}`);
+        console.log(`   Support Queries: ${this.supportQueries.length}`);
       } else {
         console.log('📝 No existing database file, starting fresh');
       }
@@ -932,7 +961,8 @@ class Database {
         archivedFlows: Array.from(this.archivedFlows.entries()),
         activities: Array.from(this.activities.entries()),
         adminActivities: this.adminActivities,
-        teams: this.teams
+        teams: this.teams,
+        supportQueries: this.supportQueries
       };
 
       fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
@@ -945,6 +975,111 @@ class Database {
   // Call saveToFile after any data modification
   private persistChanges(): void {
     this.saveToFile();
+  }
+
+  // Support Query Management Methods
+  createSupportQuery(
+    userId: string,
+    userName: string,
+    userEmail: string,
+    subject: string,
+    category: 'technical' | 'billing' | 'feature' | 'bug' | 'other',
+    priority: 'low' | 'medium' | 'high' | 'urgent',
+    description: string
+  ): SupportQuery {
+    const query: SupportQuery = {
+      id: `query-${Date.now()}`,
+      userId,
+      userName,
+      userEmail,
+      subject,
+      category,
+      priority,
+      description,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      responses: []
+    };
+
+    this.supportQueries.unshift(query);
+    this.addAdminActivity('System', `New support query: ${subject} (${priority})`);
+    this.persistChanges();
+    
+    console.log(`📩 Support query created: ${query.id} by ${userName}`);
+    return query;
+  }
+
+  getAllSupportQueries(): SupportQuery[] {
+    return this.supportQueries;
+  }
+
+  getUserSupportQueries(userId: string): SupportQuery[] {
+    return this.supportQueries.filter(q => q.userId === userId);
+  }
+
+  getSupportQuery(queryId: string): SupportQuery | undefined {
+    return this.supportQueries.find(q => q.id === queryId);
+  }
+
+  updateQueryStatus(
+    queryId: string,
+    status: 'open' | 'in_progress' | 'resolved' | 'closed'
+  ): SupportQuery | null {
+    const query = this.supportQueries.find(q => q.id === queryId);
+    if (!query) return null;
+
+    query.status = status;
+    query.updatedAt = new Date().toISOString();
+    
+    if (status === 'resolved' || status === 'closed') {
+      query.resolvedAt = new Date().toISOString();
+    }
+
+    this.persistChanges();
+    console.log(`✅ Query ${queryId} status updated to: ${status}`);
+    return query;
+  }
+
+  addQueryResponse(
+    queryId: string,
+    responderId: string,
+    responderName: string,
+    message: string
+  ): SupportQuery | null {
+    const query = this.supportQueries.find(q => q.id === queryId);
+    if (!query) return null;
+
+    const response: QueryResponse = {
+      id: `response-${Date.now()}`,
+      queryId,
+      responderId,
+      responderName,
+      message,
+      createdAt: new Date().toISOString()
+    };
+
+    query.responses.push(response);
+    query.updatedAt = new Date().toISOString();
+    
+    // Auto-update status to in_progress if it was open
+    if (query.status === 'open') {
+      query.status = 'in_progress';
+    }
+
+    this.persistChanges();
+    console.log(`💬 Response added to query ${queryId} by ${responderName}`);
+    return query;
+  }
+
+  deleteSupportQuery(queryId: string): boolean {
+    const index = this.supportQueries.findIndex(q => q.id === queryId);
+    if (index === -1) return false;
+
+    this.supportQueries.splice(index, 1);
+    this.persistChanges();
+    console.log(`🗑️ Support query deleted: ${queryId}`);
+    return true;
   }
 }
 
