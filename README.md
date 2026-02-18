@@ -92,6 +92,18 @@ Traditional onboarding processes face critical limitations:
 </details>
 
 <details open>
+<summary><b>💬 Support System</b></summary>
+<br>
+- 🎫 **Query Management** — Submit and track support queries with priority levels
+- 📊 **Admin Dashboard** — Centralized support query management for administrators
+- 🔔 **Smart Notifications** — Real-time alerts for support responses and status updates
+- 💬 **Response System** — Two-way communication between users and support team
+- 📈 **Status Tracking** — Monitor query progress from open to resolved
+- ❓ **FAQ Section** — Quick answers to common questions
+
+</details>
+
+<details open>
 <summary><b>📊 Progress & Analytics</b></summary>
 <br>
 - ⏱️ **Real-Time Tracking** — Monitor completion percentage and time investment
@@ -107,6 +119,8 @@ Traditional onboarding processes face critical limitations:
 <br>
 - 🖥️ **Three-Panel Interface** — Intuitive layout with sidebar, main content, and properties panel
 - 🎊 **Celebration Animations** — Trophy and confetti effects upon completion
+- ✨ **Welcome Animation** — Beautiful multi-stage animation for new user registrations
+- 👁️ **Password Visibility Toggle** — Eye icon to show/hide passwords on login and register
 - 📚 **Onboarding History** — Archive completed flows with PDF report generation
 - 📱 **Responsive Design** — Seamless experience across all devices and screen sizes
 - ⏯️ **Document Queue UI** — Visual queue management with intuitive play/pause controls
@@ -118,6 +132,7 @@ Traditional onboarding processes face critical limitations:
 <br>
 - 🔐 **Secure Authentication** — JWT tokens with bcrypt password hashing
 - 👮 **Role-Based Access Control** — Granular permissions for admin and user roles
+- 🔔 **Notification System** — Real-time notifications for support queries and team updates
 - 💾 **Data Persistence** — File-based JSON storage ensuring data integrity across restarts
 - 📂 **Document Management** — Multi-document support per user/team with streamlined deletion
 - ⏰ **Activity Timestamps** — Accurate time tracking with persistent storage
@@ -230,7 +245,8 @@ Traditional onboarding processes face critical limitations:
 2. 🤖 AI generates complete workflow automatically
 3. 👥 Users follow guided steps with AI assistance
 4. 📈 Track progress via real-time dashboard
-5. 📄 Download completion reports instantly
+5. 💬 Get instant support through integrated help center
+6. 📄 Download completion reports instantly
 
 <div align="center">
 
@@ -254,6 +270,7 @@ Traditional onboarding processes face critical limitations:
 - ✅ Clear step-by-step guidance
 - 🎯 AI-determined optimal sequence
 - 💬 Instant chatbot assistance 24/7
+- 🎫 Built-in support center for queries
 - 📊 Real-time progress visibility
 - 🎉 Celebration upon completion
 
@@ -316,7 +333,8 @@ onboard-flow/
 │   │   ├── ui/                  # shadcn/ui components
 │   │   ├── BrowserChrome.tsx    # Browser-like UI wrapper
 │   │   ├── NavLink.tsx          # Navigation component
-│   │   └── NotificationPopup.tsx # Team notifications
+│   │   ├── NotificationPopup.tsx # Real-time notifications
+│   │   └── WelcomeAnimation.tsx # New user welcome animation
 │   ├── contexts/                # React contexts
 │   │   └── AuthContext.tsx      # Authentication context
 │   ├── hooks/                   # Custom React hooks
@@ -333,6 +351,7 @@ onboard-flow/
 │   │   ├── LoginPage.tsx        # Login page
 │   │   ├── OnboardingPage.tsx   # Onboarding workflow
 │   │   ├── RegisterPage.tsx     # Registration page
+│   │   ├── SupportPage.tsx      # Support center & query management
 │   │   ├── TeamsPage.tsx        # Team management
 │   │   └── UploadPage.tsx       # Document upload
 │   ├── test/                    # Test files and setup
