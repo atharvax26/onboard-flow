@@ -170,17 +170,31 @@ Traditional onboarding processes face critical limitations:
 
 3. **Configure environment**
    
-   Create `.env` in root:
+   Copy the example environment files and fill in your values:
+   
+   ```bash
+   # Copy frontend environment file
+   cp .env.example .env
+   
+   # Copy backend environment file
+   cp server/.env.example server/.env
+   ```
+   
+   Then edit the files with your values:
+   
+   `.env`:
    ```env
    VITE_API_URL=http://localhost:3001/api
    ```
    
-   Create `server/.env`:
+   `server/.env`:
    ```env
    GEMINI_API_KEY=your_api_key_here
    PORT=3001
    JWT_SECRET=your_secret_here
    ```
+   
+   **Get your Gemini API key:** [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
 4. **Start the application**
    
