@@ -756,7 +756,7 @@ app.post('/api/support/query', authenticateToken, (req: AuthRequest, res) => {
   try {
     const query = db.createSupportQuery(
       user.email,
-      user.name,
+      user.name || user.email,
       user.email,
       subject,
       category,
@@ -862,7 +862,7 @@ app.post('/api/support/query/:queryId/response', authenticateToken, (req: AuthRe
   const query = db.addQueryResponse(
     queryId,
     req.user!.email,
-    req.user!.name,
+    req.user!.name || req.user!.email,
     message
   );
 
@@ -874,7 +874,7 @@ app.post('/api/support/query/:queryId/response', authenticateToken, (req: AuthRe
   db.addNotification(query.userId, {
     type: 'info',
     title: 'Support Response Received',
-    message: `${req.user!.name} responded to your query: "${query.subject}"`,
+    message: `${req.user!.name || req.user!.email} responded to your query: "${query.subject}"`,
   });
 
   res.json({ success: true, query });
