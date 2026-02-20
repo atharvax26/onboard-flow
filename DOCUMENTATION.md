@@ -26,6 +26,12 @@
 - 📈 Maturity scoring system
 - 📦 Onboarding history and archiving
 - 🎉 Celebration animations on completion
+- 👥 Team management with member notifications
+- 📑 Document queue system for sequential processing
+- 🎫 Support query system with admin dashboard
+- 🔔 Real-time notification system
+- ✨ Welcome animation for new users
+- 👁️ Password visibility toggle
 
 ---
 
@@ -66,6 +72,37 @@
 - Automatic archiving of completed flows
 - Trophy animation with confetti effects
 - Smooth transitions to history section
+
+### 7. Team Management
+- Create and manage teams
+- Add/remove team members
+- Team-specific document uploads
+- Document queue system for sequential processing
+- Real-time notifications for team changes
+- Member activity tracking
+
+### 8. Support System
+- Submit support queries with priority levels
+- Admin dashboard for query management
+- Two-way communication system
+- Status tracking (open, in-progress, resolved)
+- Real-time notifications for responses
+- FAQ section for common questions
+
+### 9. Notification System
+- Real-time notifications for support responses
+- Team membership change alerts
+- Document processing updates
+- Persistent notification storage
+- Mark as read functionality
+- Notification popup with auto-dismiss
+
+### 10. Enhanced User Experience
+- Welcome animation for new registrations
+- Password visibility toggle on login/register
+- Responsive design across all devices
+- Activity feed with accurate timestamps
+- User analytics with step-by-step progress
 
 ---
 
@@ -176,7 +213,11 @@ onboard-flow/
 │   │   │   ├── StepContent.tsx  # Step display component
 │   │   │   ├── ArchivedFlows.tsx # History component
 │   │   │   └── OnboardingChatbot.tsx # AI chatbot
-│   │   └── ui/                  # shadcn/ui components
+│   │   ├── ui/                  # shadcn/ui components
+│   │   ├── BrowserChrome.tsx    # Browser-like UI wrapper
+│   │   ├── NavLink.tsx          # Navigation component
+│   │   ├── NotificationPopup.tsx # Real-time notifications
+│   │   └── WelcomeAnimation.tsx # New user welcome animation
 │   ├── contexts/                # React contexts
 │   │   └── AuthContext.tsx      # Authentication context
 │   ├── hooks/                   # Custom React hooks
@@ -185,27 +226,42 @@ onboard-flow/
 │   │   ├── types.ts            # TypeScript types
 │   │   └── utils.ts            # Utility functions
 │   ├── pages/                   # Page components
+│   │   ├── AccountPage.tsx     # User account management
+│   │   ├── AnalyticsPage.tsx   # Admin analytics dashboard
+│   │   ├── DashboardPage.tsx   # Main dashboard
+│   │   ├── Index.tsx           # Root index page
+│   │   ├── LandingPage.tsx     # Public landing page
+│   │   ├── LoginPage.tsx       # Login page
+│   │   ├── MigrationPage.tsx   # Document migration management
+│   │   ├── NotFound.tsx        # 404 error page
 │   │   ├── OnboardingPage.tsx  # Main onboarding interface
-│   │   ├── UploadPage.tsx      # Document upload
-│   │   ├── DashboardPage.tsx   # Admin dashboard
-│   │   └── ...
+│   │   ├── RegisterPage.tsx    # Registration page
+│   │   ├── SupportPage.tsx     # Support center & query management
+│   │   ├── TeamsPage.tsx       # Team management
+│   │   └── UploadPage.tsx      # Document upload
+│   ├── test/                    # Test files and setup
 │   └── index.css               # Global styles
 ├── server/                      # Backend source code
 │   ├── src/
 │   │   ├── services/           # Business logic
 │   │   │   ├── gemini.ts       # AI integration
-│   │   │   └── database.ts     # In-memory database
+│   │   │   └── database.ts     # File-based database
 │   │   ├── routes/             # API routes
 │   │   │   └── auth.ts         # Authentication routes
 │   │   ├── middleware/         # Express middleware
 │   │   │   └── auth.ts         # JWT authentication
-│   │   └── index.ts            # Server entry point
+│   │   ├── types/              # TypeScript type definitions
+│   │   ├── index.ts            # Server entry point
+│   │   └── migrate-queue.ts    # Queue migration utility
+│   │   data/                   # JSON database storage
+│   │   │   └── database.json   # Persistent data file
 │   └── .env                    # Backend environment variables
 ├── public/                      # Static assets
 │   ├── favicon.svg             # Custom favicon
 │   └── ...
 ├── start-dev.bat               # Windows startup script
 ├── DOCUMENTATION.md            # This file
+├── CHANGELOG.md                # Version history
 └── package.json                # Dependencies
 
 ```

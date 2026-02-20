@@ -361,8 +361,11 @@ onboard-flow/
 │   │   ├── AccountPage.tsx      # User account management
 │   │   ├── AnalyticsPage.tsx    # Admin analytics dashboard
 │   │   ├── DashboardPage.tsx    # Main dashboard
+│   │   ├── Index.tsx            # Root index page
 │   │   ├── LandingPage.tsx      # Public landing page
 │   │   ├── LoginPage.tsx        # Login page
+│   │   ├── MigrationPage.tsx    # Document migration management
+│   │   ├── NotFound.tsx         # 404 error page
 │   │   ├── OnboardingPage.tsx   # Onboarding workflow
 │   │   ├── RegisterPage.tsx     # Registration page
 │   │   ├── SupportPage.tsx      # Support center & query management
@@ -376,7 +379,7 @@ onboard-flow/
 │   │   ├── middleware/          # Express middleware
 │   │   │   └── auth.ts          # JWT authentication
 │   │   ├── routes/              # API routes
-│   │   │   └── auth.ts          # Auth routes
+│   │   │   └── auth.ts          # Authentication routes
 │   │   ├── services/            # Business logic
 │   │   │   ├── database.ts      # File-based database
 │   │   │   └── gemini.ts        # Google Gemini AI integration

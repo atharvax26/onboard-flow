@@ -2,6 +2,69 @@
 
 All notable changes to Onboard Flow will be documented in this file.
 
+## [1.3.0] - 2026-02-20
+
+### Added
+- 👥 **Team Management System**
+  - Create and manage teams with multiple members
+  - Team-specific document uploads
+  - Add/remove team members with real-time notifications
+  - Member activity tracking
+  
+- 📑 **Document Queue System**
+  - Sequential processing of multiple documents per team
+  - Visual queue management with play/pause controls
+  - Automatic queue progression
+  - Document deletion with queue management
+
+- 🎫 **Support Query System**
+  - Submit support queries with priority levels (low, medium, high)
+  - Admin dashboard for centralized query management
+  - Two-way communication between users and support
+  - Status tracking (open, in-progress, resolved)
+  - FAQ section for common questions
+
+- 🔔 **Real-Time Notification System**
+  - Notifications for support query responses
+  - Team membership change alerts
+  - Document processing updates
+  - Persistent notification storage
+  - Mark as read functionality
+  - Auto-dismiss notification popup
+
+- ✨ **Enhanced User Experience**
+  - Welcome animation for new user registrations
+  - Multi-stage animation with smooth transitions
+  - Password visibility toggle on login and register pages
+  - Eye icon to show/hide passwords
+  - Improved form accessibility
+
+- 📊 **Enhanced Analytics**
+  - User analytics with step-by-step progress visualization
+  - Activity feed with accurate timestamps
+  - Persistent activity storage
+  - Admin dashboard improvements
+
+### Improved
+- 🔄 **Migration System**
+  - Document queue migration utility
+  - Backward compatibility for existing data
+  - Automatic data structure updates
+
+- 📱 **UI/UX Enhancements**
+  - Responsive notification popup
+  - Better team management interface
+  - Improved support center layout
+  - Enhanced document queue visualization
+
+### Fixed
+- ✅ Notification persistence across sessions
+- ✅ Activity timestamp accuracy
+- ✅ Team member notification delivery
+- ✅ Document queue state management
+
+---
+
 ## [1.2.0] - 2026-02-14
 
 ### Added
