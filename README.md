@@ -17,6 +17,12 @@
 
 </div>
 
+## Architecture notes
+
+The current release uses a file-based JSON store for simplicity. A production deployment would swap [`server/src/services/database.ts`](server/src/services/database.ts) for a PostgreSQL or MongoDB adapter.
+
+---
+
 ## 🎯 Overview
 
 <table>

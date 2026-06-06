@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  install-and-lint:
+    name: Install & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: TypeScript — frontend
+        run: npx tsc --noEmit
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: TypeScript — backend
+        working-directory: server
+        run: npx tsc --noEmit
+
+  docker-build:
+    name: Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: false
+          tags: onboard-flow-backend:ci
+          load: true
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: false
+          tags: onboard-flow-frontend:ci
+          load: true
+          build-args: |
+            VITE_API_URL=/api
+
+      - name: Start services and verify backend health
+        env:
+          GEMINI_API_KEY: ci-placeholder
+          JWT_SECRET: ci-placeholder-secret
+        run: |
+          docker compose up -d
+          timeout 60 bash -c 'until curl -sf http://localhost:3001/health; do sleep 2; done'
+          echo "Backend healthy"
+          docker compose down

@@ -16,6 +16,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.use(cors());
 app.use(express.json());
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // Auth routes (no authentication required)
 app.use('/api/auth', authRouter);
 
