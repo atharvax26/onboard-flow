@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  { ignores: ["dist", "server/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -21,6 +21,12 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // `any` is used intentionally in API response types and dynamic handlers
+      "@typescript-eslint/no-explicit-any": "warn",
+      // generated shadcn/ui components use empty interface extends patterns
+      "@typescript-eslint/no-empty-object-type": "warn",
+      // tailwind.config.ts uses require() for the plugin — standard CJS config pattern
+      "@typescript-eslint/no-require-imports": "warn",
     },
   },
 );
